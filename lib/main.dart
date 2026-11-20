@@ -6,8 +6,11 @@ import 'views/dashboard_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialisation du stockage local ultra-rapide (SQLite Desktop/Mobile ou Cache Web PWA)
-  await DatabaseService.instance.init();
+  try {
+    await DatabaseService.instance.init();
+  } catch (e) {
+    debugPrint('Init storage warning: $e');
+  }
 
   runApp(const DocPocketMedocsApp());
 }

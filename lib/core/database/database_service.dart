@@ -1,126 +1,79 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/medicine.dart';
 import '../../models/medicine_batch.dart';
 import '../../models/stock_movement.dart';
 import '../../models/stock_alert_level.dart';
 
-// Imports conditionnels pour SQLite sur Desktop / Mobile
-import 'package:sqflite/sqflite.dart' as sqflite;
-import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'dart:io' as io;
-
-/// Service de stockage local 100% rapide et autonome (SQLite sur Desktop/Mobile, In-Memory/Web sur PWA)
+/// Service de stockage local 100% rapide, autonome et universel
+/// Compatible Web (PWA / localStorage), Windows, macOS et Mobile (zéro plantage dart:io)
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
   DatabaseService._internal();
 
-  sqflite.Database? _sqliteDb;
+  static const String _prefKeyMedicines = 'docpocket_medocs_medicines_v1';
+  static const String _prefKeyMovements = 'docpocket_medocs_movements_v1';
 
-  // Cache mémoire utilisé sur Web (PWA) et comme cache synchronisé
-  final Map<String, Medicine> _memoryMedicines = {};
-  final List<StockMovement> _memoryMovements = [];
+  final Map<String, Medicine> _medicines = {};
+  final List<StockMovement> _movements = [];
   bool _initialized = false;
 
   Future<void> init() async {
     if (_initialized) return;
 
-    if (kIsWeb) {
-      await _initWeb();
+    final prefs = await SharedPreferences.getInstance();
+    final savedMeds = prefs.getString(_prefKeyMedicines);
+    final savedMoves = prefs.getString(_prefKeyMovements);
+
+    if (savedMeds != null && savedMeds.isNotEmpty) {
+      try {
+        final list = json.decode(savedMeds) as List<dynamic>;
+        _medicines.clear();
+        for (final item in list) {
+          final map = item as Map<String, dynamic>;
+          final batchesJson = map['batches'] as List<dynamic>? ?? [];
+          final batches = batchesJson.map((b) => MedicineBatch.fromMap(b as Map<String, dynamic>)).toList();
+          final med = Medicine.fromMap(map, batches);
+          _medicines[med.cipGtin] = med;
+        }
+      } catch (e) {
+        // En cas de corruption, réinitialiser avec les données par défaut
+        await _seedInitialData();
+      }
     } else {
-      await _initSqlite();
+      await _seedInitialData();
     }
+
+    if (savedMoves != null && savedMoves.isNotEmpty) {
+      try {
+        final list = json.decode(savedMoves) as List<dynamic>;
+        _movements.clear();
+        for (final item in list) {
+          _movements.add(StockMovement.fromMap(item as Map<String, dynamic>));
+        }
+      } catch (_) {}
+    }
+
     _initialized = true;
   }
 
-  // --------------------------------------------------------------------------
-  // INITIALISATION SQLITE (Desktop Windows / macOS / Mobile Android)
-  // --------------------------------------------------------------------------
-  Future<void> _initSqlite() async {
-    if (io.Platform.isWindows || io.Platform.isMacOS || io.Platform.isLinux) {
-      ffi.sqfliteFfiInit();
-      sqflite.databaseFactory = ffi.databaseFactoryFfi;
-    }
+  Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
 
-    final docsDir = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(docsDir.path, 'docpocket_medocs.db');
+    final medsJson = _medicines.values
+        .map((m) => {
+              ...m.toMap(),
+              'batches': m.batches.map((b) => b.toMap()).toList(),
+            })
+        .toList();
+    await prefs.setString(_prefKeyMedicines, json.encode(medsJson));
 
-    _sqliteDb = await sqflite.openDatabase(
-      dbPath,
-      version: 1,
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE medicines (
-            id TEXT PRIMARY KEY,
-            cip_gtin TEXT UNIQUE NOT NULL,
-            commercial_name TEXT NOT NULL,
-            dci TEXT NOT NULL,
-            dosage TEXT NOT NULL,
-            form TEXT NOT NULL,
-            therapeutic_class TEXT NOT NULL,
-            laboratory TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-          );
-        ''');
-
-        await db.execute('''
-          CREATE TABLE batches (
-            id TEXT PRIMARY KEY,
-            medicine_id TEXT NOT NULL,
-            batch_number TEXT NOT NULL,
-            expiry_date TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            initial_quantity INTEGER NOT NULL,
-            received_date TEXT NOT NULL,
-            serial_number TEXT,
-            FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE
-          );
-        ''');
-
-        await db.execute('''
-          CREATE TABLE movements (
-            id TEXT PRIMARY KEY,
-            medicine_id TEXT NOT NULL,
-            batch_id TEXT,
-            type TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            movement_date TEXT NOT NULL,
-            patient_identifier TEXT,
-            medicine_name_snapshot TEXT NOT NULL,
-            batch_number_snapshot TEXT NOT NULL,
-            note TEXT
-          );
-        ''');
-
-        await db.execute('CREATE INDEX idx_medicines_gtin ON medicines(cip_gtin);');
-        await db.execute('CREATE INDEX idx_batches_expiry ON batches(expiry_date);');
-      },
-    );
-
-    // Initialiser les données de démonstration si la base est vide
-    final count = sqflite.Sqflite.firstIntValue(
-      await _sqliteDb!.rawQuery('SELECT COUNT(*) FROM medicines'),
-    );
-    if (count == 0) {
-      await _seedInitialData();
-    }
+    final movesJson = _movements.map((mov) => mov.toMap()).toList();
+    await prefs.setString(_prefKeyMovements, json.encode(movesJson));
   }
 
   // --------------------------------------------------------------------------
-  // INITIALISATION WEB / PWA
-  // --------------------------------------------------------------------------
-  Future<void> _initWeb() async {
-    // Si vide, insérer des exemples médicaux réalistes
-    if (_memoryMedicines.isEmpty) {
-      await _seedInitialData();
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // JEU DE DONNÉES INITIAL (ÉCHANTILLONS MÉDICAUX TYPE)
+  // JEU DE DONNÉES INITIAL
   // --------------------------------------------------------------------------
   Future<void> _seedInitialData() async {
     final now = DateTime.now();
@@ -224,16 +177,15 @@ class DatabaseService {
       ),
     ];
 
+    _medicines.clear();
     for (final med in samples) {
-      await saveMedicine(med);
-      for (final b in med.batches) {
-        await saveBatch(b);
-      }
+      _medicines[med.cipGtin] = med;
     }
+    await _persist();
   }
 
   // --------------------------------------------------------------------------
-  // LECTURE & RECHERCHE DES MÉDICAMENTS
+  // LECTURE & RECHERCHE
   // --------------------------------------------------------------------------
   Future<List<Medicine>> getAllMedicines({
     String? searchQuery,
@@ -241,31 +193,9 @@ class DatabaseService {
   }) async {
     await init();
 
-    List<Medicine> list = [];
+    var list = _medicines.values.toList();
+    list.sort((a, b) => a.commercialName.compareTo(b.commercialName));
 
-    if (!kIsWeb && _sqliteDb != null) {
-      final rows = await _sqliteDb!.query(
-        'medicines',
-        orderBy: 'commercial_name ASC',
-      );
-
-      for (final r in rows) {
-        final medId = r['id'].toString();
-        final batchRows = await _sqliteDb!.query(
-          'batches',
-          where: 'medicine_id = ?',
-          whereArgs: [medId],
-          orderBy: 'expiry_date ASC',
-        );
-        final batches = batchRows.map((b) => MedicineBatch.fromMap(b)).toList();
-        list.add(Medicine.fromMap(r, batches));
-      }
-    } else {
-      list = _memoryMedicines.values.toList();
-      list.sort((a, b) => a.commercialName.compareTo(b.commercialName));
-    }
-
-    // Filtrage par recherche
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       final q = searchQuery.toLowerCase().trim();
       list = list.where((m) {
@@ -279,7 +209,6 @@ class DatabaseService {
       }).toList();
     }
 
-    // Filtrage par alerte sémantique
     if (alertFilter != null) {
       list = list.where((m) => m.overallAlertLevel == alertFilter).toList();
     }
@@ -287,63 +216,24 @@ class DatabaseService {
     return list;
   }
 
-  /// Recherche un médicament par son code CIP / GTIN
   Future<Medicine?> getMedicineByGtin(String gtin) async {
     await init();
     final cleanGtin = gtin.trim();
-
-    if (!kIsWeb && _sqliteDb != null) {
-      final rows = await _sqliteDb!.query(
-        'medicines',
-        where: 'cip_gtin = ?',
-        whereArgs: [cleanGtin],
-      );
-      if (rows.isEmpty) return null;
-
-      final medId = rows.first['id'].toString();
-      final batchRows = await _sqliteDb!.query(
-        'batches',
-        where: 'medicine_id = ?',
-        whereArgs: [medId],
-        orderBy: 'expiry_date ASC',
-      );
-      final batches = batchRows.map((b) => MedicineBatch.fromMap(b)).toList();
-      return Medicine.fromMap(rows.first, batches);
-    } else {
-      return _memoryMedicines[cleanGtin];
-    }
+    return _medicines[cleanGtin];
   }
 
   // --------------------------------------------------------------------------
-  // ÉCRITURE : MÉDICAMENTS & LOTS
+  // ÉCRITURE
   // --------------------------------------------------------------------------
   Future<void> saveMedicine(Medicine medicine) async {
     await init();
-
-    if (!kIsWeb && _sqliteDb != null) {
-      await _sqliteDb!.insert(
-        'medicines',
-        medicine.toMap(),
-        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
-      );
-    }
-
-    _memoryMedicines[medicine.cipGtin] = medicine;
+    _medicines[medicine.cipGtin] = medicine;
+    await _persist();
   }
 
   Future<void> saveBatch(MedicineBatch batch) async {
     await init();
-
-    if (!kIsWeb && _sqliteDb != null) {
-      await _sqliteDb!.insert(
-        'batches',
-        batch.toMap(),
-        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
-      );
-    }
-
-    // Mise à jour synchrone de la mémoire
-    for (final med in _memoryMedicines.values) {
+    for (final med in _medicines.values) {
       if (med.id == batch.medicineId) {
         final existingIdx = med.batches.indexWhere((b) => b.id == batch.id);
         if (existingIdx >= 0) {
@@ -354,10 +244,11 @@ class DatabaseService {
         break;
       }
     }
+    await _persist();
   }
 
   // --------------------------------------------------------------------------
-  // FLUX ENTRÉE EN STOCK (RÉCEPTION DÉLÉGUÉ)
+  // FLUX ENTRÉE EN STOCK
   // --------------------------------------------------------------------------
   Future<void> recordStockEntry({
     required Medicine medicine,
@@ -370,10 +261,10 @@ class DatabaseService {
     await init();
     final now = DateTime.now();
 
-    // 1. Sauvegarder la fiche médicament (si nouvelle ou mise à jour)
+    // 1. Sauvegarder la fiche médicament
     await saveMedicine(medicine);
 
-    // 2. Vérifier si ce numéro de lot existe déjà pour ce médicament
+    // 2. Traiter le lot
     MedicineBatch? targetBatch;
     for (final b in medicine.batches) {
       if (b.batchNumber.toLowerCase().trim() == batchNumber.toLowerCase().trim()) {
@@ -402,7 +293,7 @@ class DatabaseService {
       await saveBatch(newBatch);
     }
 
-    // 3. Enregistrer le mouvement de traçabilité
+    // 3. Mouvement de traçabilité
     final movement = StockMovement(
       id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
       medicineId: medicine.id,
@@ -412,13 +303,13 @@ class DatabaseService {
       movementDate: now,
       medicineNameSnapshot: medicine.commercialName,
       batchNumberSnapshot: batchNumber,
-      note: note ?? 'Réception délégué médical',
+      note: note ?? 'Réception délégué (${medicine.laboratory})',
     );
     await recordMovement(movement);
   }
 
   // --------------------------------------------------------------------------
-  // FLUX SORTIE DU STOCK (REMISE AU PATIENT - MÉTHODE FEFO)
+  // FLUX SORTIE DU STOCK (FEFO)
   // --------------------------------------------------------------------------
   Future<Map<MedicineBatch, int>> recordStockExitFefo({
     required Medicine medicine,
@@ -456,35 +347,20 @@ class DatabaseService {
   }
 
   // --------------------------------------------------------------------------
-  // GESTION DES MOUVEMENTS & TRAÇABILITÉ
+  // TRAÇABILITÉ
   // --------------------------------------------------------------------------
   Future<void> recordMovement(StockMovement movement) async {
     await init();
-
-    if (!kIsWeb && _sqliteDb != null) {
-      await _sqliteDb!.insert('movements', movement.toMap());
-    }
-    _memoryMovements.insert(0, movement);
+    _movements.insert(0, movement);
+    await _persist();
   }
 
   Future<List<StockMovement>> getMovements({String? medicineId}) async {
     await init();
-
-    if (!kIsWeb && _sqliteDb != null) {
-      final rows = await _sqliteDb!.query(
-        'movements',
-        where: medicineId != null ? 'medicine_id = ?' : null,
-        whereArgs: medicineId != null ? [medicineId] : null,
-        orderBy: 'movement_date DESC',
-        limit: 100,
-      );
-      return rows.map((m) => StockMovement.fromMap(m)).toList();
-    } else {
-      if (medicineId != null) {
-        return _memoryMovements.where((m) => m.medicineId == medicineId).toList();
-      }
-      return _memoryMovements;
+    if (medicineId != null) {
+      return _movements.where((m) => m.medicineId == medicineId).toList();
     }
+    return _movements;
   }
 
   // --------------------------------------------------------------------------
@@ -527,7 +403,7 @@ class DatabaseService {
   }
 
   // --------------------------------------------------------------------------
-  // EXPORT / IMPORT SAUVEGARDE JSON & CSV
+  // EXPORT / IMPORT JSON & CSV
   // --------------------------------------------------------------------------
   Future<String> exportBackupJson() async {
     final medicines = await getAllMedicines();
@@ -558,18 +434,21 @@ class DatabaseService {
       final batchesJson = map['batches'] as List<dynamic>? ?? [];
       final batches = batchesJson.map((b) => MedicineBatch.fromMap(b as Map<String, dynamic>)).toList();
       final med = Medicine.fromMap(map, batches);
-      await saveMedicine(med);
-      for (final b in batches) {
-        await saveBatch(b);
-      }
+      _medicines[med.cipGtin] = med;
     }
+
+    final movesJson = decoded['movements'] as List<dynamic>? ?? [];
+    for (final item in movesJson) {
+      _movements.add(StockMovement.fromMap(item as Map<String, dynamic>));
+    }
+
+    await _persist();
   }
 
   Future<String> exportInventoryCsv() async {
     final medicines = await getAllMedicines();
     final buffer = StringBuffer();
 
-    // En-tête CSV
     buffer.writeln(
       'CIP/GTIN,Nom commercial,DCI,Dosage,Forme,Classe thérapeutique,Laboratoire,N° Lot,Date de péremption,Quantité en stock,Alerte',
     );
