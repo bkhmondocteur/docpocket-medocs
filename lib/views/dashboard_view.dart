@@ -13,6 +13,7 @@ import 'medicine_detail_view.dart';
 import 'widgets/alert_badge.dart';
 import 'widgets/big_touch_button.dart';
 import 'widgets/camera_scanner_modal.dart';
+import 'widgets/medicine_catalog_picker.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
 class DashboardView extends StatefulWidget {
@@ -228,7 +229,7 @@ class _DashboardViewState extends State<DashboardView> {
                 width: 38,
                 height: 38,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
+                errorBuilder: (context, error, stackTrace) => const Icon(
                   Icons.medication_liquid_rounded,
                   color: AppColors.primaryBlue,
                   size: 32,
@@ -277,6 +278,9 @@ class _DashboardViewState extends State<DashboardView> {
                 case 'pdf_alerts':
                   PdfReportService.printAlertsReport(_medicines);
                   break;
+                case 'catalog':
+                  MedicineCatalogPickerDialog.show(context);
+                  break;
                 case 'export_json':
                   _exportBackupJson();
                   break;
@@ -306,6 +310,16 @@ class _DashboardViewState extends State<DashboardView> {
                     Icon(Icons.warning_amber_rounded, color: AppColors.alertExpired),
                     SizedBox(width: 10),
                     Text('Imprimer Alertes Péremptions (PDF)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'catalog',
+                child: Row(
+                  children: [
+                    Icon(Icons.menu_book_rounded, color: AppColors.primaryDark),
+                    SizedBox(width: 10),
+                    Text('Dictionnaire Médicaments (5 112)'),
                   ],
                 ),
               ),
