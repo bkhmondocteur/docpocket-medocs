@@ -319,7 +319,7 @@ class _DashboardViewState extends State<DashboardView> {
                   children: [
                     Icon(Icons.menu_book_rounded, color: AppColors.primaryDark),
                     SizedBox(width: 10),
-                    Text('Dictionnaire Médicaments (5 112)'),
+                    Text('Dictionnaire Médicaments (5 063)'),
                   ],
                 ),
               ),

@@ -424,8 +424,8 @@ class _StockEntryViewState extends State<StockEntryView> {
                               icon: const Icon(Icons.manage_search_rounded),
                               label: Text(
                                 _isAssigned
-                                    ? 'Changer le médicament assigné (5 112 dans la base)'
-                                    : 'Assigner à un médicament de la base (5 112 médicaments)',
+                                    ? 'Changer le médicament assigné (5 063 dans la base)'
+                                    : 'Assigner à un médicament de la base (5 063 médicaments)',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               style: ElevatedButton.styleFrom(
