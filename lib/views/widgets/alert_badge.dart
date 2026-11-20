@@ -26,7 +26,7 @@ class AlertBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: level.backgroundColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: level.color.withOpacity(0.4), width: 1.2),
+        border: Border.all(color: level.color.withValues(alpha: 0.4), width: 1.2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

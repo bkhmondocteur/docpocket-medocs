@@ -6,13 +6,15 @@ import '../../models/stock_movement.dart';
 import '../../models/stock_alert_level.dart';
 
 /// Service de stockage local 100% rapide, autonome et universel
-/// Compatible Web (PWA / localStorage), Windows, macOS et Mobile (zéro plantage dart:io)
+/// Compatible Web (PWA / localStorage), Windows, macOS et Mobile
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
   DatabaseService._internal();
 
-  static const String _prefKeyMedicines = 'docpocket_medocs_medicines_v1';
-  static const String _prefKeyMovements = 'docpocket_medocs_movements_v1';
+  // Version 3 garantie 100% propre sans stock fictif pour cabinet médical
+  static const String _prefKeyMedicines = 'docpocket_medocs_medicines_v3';
+  static const String _prefKeyMovements = 'docpocket_medocs_movements_v3';
+  static const String _prefKeyPurgeFlag = 'docpocket_has_purged_initial_stock_v3';
 
   final Map<String, Medicine> _medicines = {};
   final List<StockMovement> _movements = [];
@@ -22,13 +24,37 @@ class DatabaseService {
     if (_initialized) return;
 
     final prefs = await SharedPreferences.getInstance();
+
+    // Nettoyer définitivement toutes les anciennes clés de test / stocks fictifs
+    final hasPurged = prefs.getBool(_prefKeyPurgeFlag) ?? false;
+    if (!hasPurged) {
+      const oldKeys = [
+        'docpocket_medicines',
+        'docpocket_movements',
+        'docpocket_medicines_v1',
+        'docpocket_movements_v1',
+        'docpocket_medocs_medicines',
+        'docpocket_medocs_movements',
+        'docpocket_medocs_medicines_v1',
+        'docpocket_medocs_movements_v1',
+        'docpocket_medocs_medicines_v2',
+        'docpocket_medocs_movements_v2',
+      ];
+      for (final k in oldKeys) {
+        await prefs.remove(k);
+      }
+      await prefs.remove(_prefKeyMedicines);
+      await prefs.remove(_prefKeyMovements);
+      await prefs.setBool(_prefKeyPurgeFlag, true);
+    }
+
     final savedMeds = prefs.getString(_prefKeyMedicines);
     final savedMoves = prefs.getString(_prefKeyMovements);
 
+    _medicines.clear();
     if (savedMeds != null && savedMeds.isNotEmpty) {
       try {
         final list = json.decode(savedMeds) as List<dynamic>;
-        _medicines.clear();
         for (final item in list) {
           final map = item as Map<String, dynamic>;
           final batchesJson = map['batches'] as List<dynamic>? ?? [];
@@ -36,22 +62,21 @@ class DatabaseService {
           final med = Medicine.fromMap(map, batches);
           _medicines[med.cipGtin] = med;
         }
-      } catch (e) {
-        // En cas de corruption, réinitialiser avec les données par défaut
-        await _seedInitialData();
+      } catch (_) {
+        _medicines.clear();
       }
-    } else {
-      await _seedInitialData();
     }
 
+    _movements.clear();
     if (savedMoves != null && savedMoves.isNotEmpty) {
       try {
         final list = json.decode(savedMoves) as List<dynamic>;
-        _movements.clear();
         for (final item in list) {
           _movements.add(StockMovement.fromMap(item as Map<String, dynamic>));
         }
-      } catch (_) {}
+      } catch (_) {
+        _movements.clear();
+      }
     }
 
     _initialized = true;
@@ -72,115 +97,10 @@ class DatabaseService {
     await prefs.setString(_prefKeyMovements, json.encode(movesJson));
   }
 
-  // --------------------------------------------------------------------------
-  // JEU DE DONNÉES INITIAL
-  // --------------------------------------------------------------------------
-  Future<void> _seedInitialData() async {
-    final now = DateTime.now();
-
-    final samples = [
-      Medicine(
-        id: 'med_1',
-        cipGtin: '3400930000014',
-        commercialName: 'Doliprane',
-        dci: 'Paracétamol',
-        dosage: '1000 mg',
-        form: 'Comprimé',
-        therapeuticClass: 'Antalgique / Antipyrétique',
-        laboratory: 'Sanofi',
-        createdAt: now,
-        updatedAt: now,
-        batches: [
-          MedicineBatch(
-            id: 'b_1a',
-            medicineId: 'med_1',
-            batchNumber: 'LOT-2024-A',
-            expiryDate: now.subtract(const Duration(days: 10)), // Périmé
-            quantity: 3,
-            initialQuantity: 10,
-            receivedDate: now.subtract(const Duration(days: 400)),
-          ),
-          MedicineBatch(
-            id: 'b_1b',
-            medicineId: 'med_1',
-            batchNumber: 'LOT-2025-X',
-            expiryDate: now.add(const Duration(days: 45)), // Périme < 90j
-            quantity: 8,
-            initialQuantity: 15,
-            receivedDate: now.subtract(const Duration(days: 90)),
-          ),
-          MedicineBatch(
-            id: 'b_1c',
-            medicineId: 'med_1',
-            batchNumber: 'LOT-2027-Z',
-            expiryDate: now.add(const Duration(days: 450)), // Valide
-            quantity: 20,
-            initialQuantity: 20,
-            receivedDate: now,
-          ),
-        ],
-      ),
-      Medicine(
-        id: 'med_2',
-        cipGtin: '3400930000021',
-        commercialName: 'Augmentin',
-        dci: 'Amoxicilline / Acide clavulanique',
-        dosage: '1 g / 125 mg',
-        form: 'Sachet poudre',
-        therapeuticClass: 'Antibiotique (Pénicilline)',
-        laboratory: 'GSK',
-        createdAt: now,
-        updatedAt: now,
-        batches: [
-          MedicineBatch(
-            id: 'b_2a',
-            medicineId: 'med_2',
-            batchNumber: 'AUG-8874',
-            expiryDate: now.add(const Duration(days: 60)), // Périme < 90j
-            quantity: 6,
-            initialQuantity: 12,
-            receivedDate: now.subtract(const Duration(days: 30)),
-          ),
-          MedicineBatch(
-            id: 'b_2b',
-            medicineId: 'med_2',
-            batchNumber: 'AUG-9912',
-            expiryDate: now.add(const Duration(days: 380)), // Valide
-            quantity: 15,
-            initialQuantity: 15,
-            receivedDate: now,
-          ),
-        ],
-      ),
-      Medicine(
-        id: 'med_3',
-        cipGtin: '3400930000038',
-        commercialName: 'Kardegic',
-        dci: 'Acétylsalicylate de DL-lysine',
-        dosage: '75 mg',
-        form: 'Sachet',
-        therapeuticClass: 'Antiagrégant plaquettaire',
-        laboratory: 'Sanofi',
-        createdAt: now,
-        updatedAt: now,
-        batches: [
-          MedicineBatch(
-            id: 'b_3a',
-            medicineId: 'med_3',
-            batchNumber: 'KARD-451',
-            expiryDate: now.add(const Duration(days: 240)), // Valide
-            quantity: 12,
-            initialQuantity: 12,
-            receivedDate: now,
-          ),
-        ],
-      ),
-    ];
-
+  /// Réinitialise l'ensemble des stocks et mouvements pour repartir à zéro
+  Future<void> clearAllStock() async {
     _medicines.clear();
-    for (final med in samples) {
-      _medicines[med.cipGtin] = med;
-    }
+    _movements.clear();
     await _persist();
   }
 
@@ -410,7 +330,7 @@ class DatabaseService {
     final movements = await getMovements();
 
     final exportData = {
-      'version': '1.0',
+      'version': '2.0',
       'appName': 'DocPocket Medocs',
       'exportDate': DateTime.now().toIso8601String(),
       'medicines': medicines

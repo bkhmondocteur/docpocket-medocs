@@ -290,6 +290,9 @@ class _DashboardViewState extends State<DashboardView> {
                 case 'export_csv':
                   _exportCsv();
                   break;
+                case 'clear_stock':
+                  _confirmClearStock();
+                  break;
               }
             },
             itemBuilder: (ctx) => [
@@ -354,6 +357,17 @@ class _DashboardViewState extends State<DashboardView> {
                   ],
                 ),
               ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'clear_stock',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_sweep_rounded, color: AppColors.alertExpired),
+                    SizedBox(width: 10),
+                    Text('Vider le stock (remise à zéro)', style: TextStyle(color: AppColors.alertExpired)),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(width: 8),
@@ -415,7 +429,7 @@ class _DashboardViewState extends State<DashboardView> {
                         _loadData();
                       },
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     _filterChip(
                       label: 'Périmés (${_stats["countExpired"]})',
                       isSelected: _selectedFilter == StockAlertLevel.expired,
@@ -425,7 +439,7 @@ class _DashboardViewState extends State<DashboardView> {
                         _loadData();
                       },
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     _filterChip(
                       label: 'Périme < 90j (${_stats["countWarning"]})',
                       isSelected: _selectedFilter == StockAlertLevel.warning,
@@ -435,7 +449,7 @@ class _DashboardViewState extends State<DashboardView> {
                         _loadData();
                       },
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     _filterChip(
                       label: 'Valides (${_stats["countValid"]})',
                       isSelected: _selectedFilter == StockAlertLevel.valid,
@@ -448,14 +462,15 @@ class _DashboardViewState extends State<DashboardView> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // Barre de recherche instantanée
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Rechercher par nom, DCI, classe thérapeutique, n° de lot...',
+                  hintText: 'Rechercher par nom commercial, forme, lot...',
                   prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryBlue),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear_rounded),
@@ -468,7 +483,7 @@ class _DashboardViewState extends State<DashboardView> {
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
                   ),
                 ),
@@ -559,20 +574,20 @@ class _DashboardViewState extends State<DashboardView> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? color : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color, width: 1.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color, width: 1.2),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? Colors.white : color,
             fontWeight: FontWeight.bold,
-            fontSize: 12.5,
+            fontSize: 11.5,
           ),
         ),
       ),
@@ -581,9 +596,11 @@ class _DashboardViewState extends State<DashboardView> {
 
   Widget _medicineCard(Medicine med) {
     final nextBatch = med.nextExpiringBatch;
+    final form = med.form.trim();
+    final packaging = med.dosage.trim();
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       elevation: 1.5,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
@@ -594,12 +611,12 @@ class _DashboardViewState extends State<DashboardView> {
           ).then((_) => _loadData());
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Ligne 1 : Nom Commercial & Badges Forme / Packaging, et Badge Alerte
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
@@ -607,59 +624,123 @@ class _DashboardViewState extends State<DashboardView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${med.commercialName} ${med.dosage}',
+                          med.commercialName,
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 16.5,
                             fontWeight: FontWeight.bold,
                             color: AppColors.slateDark,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${med.dci} • ${med.form}',
-                          style: const TextStyle(fontSize: 13, color: AppColors.slateMedium),
-                        ),
+                        if (form.isNotEmpty || packaging.isNotEmpty) ...[
+                          const SizedBox(height: 5),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (form.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.blue.shade200, width: 0.8),
+                                  ),
+                                  child: Text(
+                                    form,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue.shade900,
+                                    ),
+                                  ),
+                                ),
+                              if (packaging.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.teal.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.teal.shade200, width: 0.8),
+                                  ),
+                                  child: Text(
+                                    packaging,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal.shade900,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   AlertBadge(level: med.overallAlertLevel),
                 ],
               ),
-              const Divider(height: 20),
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+
+              // Ligne 2 : Date péremption & lot (Expanded) ET Quantité restante (pill)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Laboratoire : ${med.laboratory.isEmpty ? "-" : med.laboratory}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.slateMedium),
-                      ),
-                      if (nextBatch != null)
-                        Text(
-                          'Prochaine péremption : ${nextBatch.expiryDateFormatted} (Lot: ${nextBatch.batchNumber})',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: nextBatch.alertLevel.color,
+                  Expanded(
+                    child: nextBatch != null
+                        ? Row(
+                            children: [
+                              Icon(
+                                Icons.event_available_rounded,
+                                size: 16,
+                                color: nextBatch.alertLevel.color,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  'Exp : ${nextBatch.expiryDateFormatted}  (Lot: ${nextBatch.batchNumber})',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: nextBatch.alertLevel.color,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          )
+                        : const Text(
+                            'Aucun lot actif',
+                            style: TextStyle(fontSize: 12, color: AppColors.slateMedium),
                           ),
-                        ),
-                    ],
                   ),
+                  const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                     decoration: BoxDecoration(
                       color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.3)),
                     ),
-                    child: Text(
-                      '${med.totalStock} boîte(s)',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryDark,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.inventory_2_rounded, size: 14, color: AppColors.primaryDark),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${med.totalStock} boîte${med.totalStock > 1 ? "s" : ""}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryDark,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -669,5 +750,47 @@ class _DashboardViewState extends State<DashboardView> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmClearStock() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.alertExpired),
+            SizedBox(width: 8),
+            Text('Vider tout le stock ?'),
+          ],
+        ),
+        content: const Text(
+          'Cette action efface définitivement tous les échantillons et mouvements enregistrés. Le stock repartira à zéro.\n\nÊtes-vous sûr de vouloir continuer ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.alertExpired),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Oui, vider le stock', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      await DatabaseService.instance.clearAllStock();
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Le stock a été réinitialisé à zéro.'),
+            backgroundColor: AppColors.primaryBlue,
+          ),
+        );
+      }
+    }
   }
 }

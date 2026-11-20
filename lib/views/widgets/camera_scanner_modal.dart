@@ -69,7 +69,7 @@ class _CameraScannerModalState extends State<CameraScannerModal> {
             width: 48,
             height: 5,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(10),
             ),
           ),
@@ -135,7 +135,7 @@ class _CameraScannerModalState extends State<CameraScannerModal> {
                       width: 16,
                       height: 16,
                       decoration: BoxDecoration(
-                        color: AppColors.primaryAccent.withOpacity(0.5),
+                        color: AppColors.primaryAccent.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -147,7 +147,7 @@ class _CameraScannerModalState extends State<CameraScannerModal> {
                   bottom: 24,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(30),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

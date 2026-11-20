@@ -3,13 +3,13 @@ import 'package:flutter/services.dart';
 
 /// Modèle d'un médicament du dictionnaire de référence pharmaceutique
 class CatalogMedicine {
-  final String name;              // Nom commercial (ex: DOLIPRANE 1000mg Comp.sec. Bt 8)
+  final String name;              // Nom complet d'origine (ex: DOLIPRANE 1000mg Comp.sec. Bt 8)
   final String dci;               // DCI (ex: PARACETAMOL)
   final String form;              // Forme galénique (ex: Comprimé sécable)
   final String laboratory;        // Laboratoire (ex: SANOFI)
   final String therapeuticClass;  // Famille thérapeutique
-  final String dosage;            // Dosage / Présentation
-  final String price;             // Prix public (DT)
+  final String dosage;            // Dosage
+  final String price;             // Prix public
 
   const CatalogMedicine({
     required this.name,
@@ -32,9 +32,59 @@ class CatalogMedicine {
       price: map['p']?.toString() ?? '',
     );
   }
+
+  /// Nom commercial épuré (ex: DOLIPRANE 1000mg)
+  String get cleanCommercialName {
+    // Si dosage explicite et absent du début du nom, on garde la racine
+    var clean = name;
+    // Supprimer les suffixes de forme abrégée et conditionnement (ex: Comp. Bt 30, Susp.or. Fl 60ml)
+    final regex = RegExp(
+      r'\s+(Comp|Gel|Susp|Pdre|Sol|Crm|Pde|Srp|Collyre|Gttes|Amp|Supp|Past|Emuls|Glé|Shamp|Caps)\b.*$',
+      caseSensitive: false,
+    );
+    clean = clean.replaceFirst(regex, '');
+    clean = clean.trim();
+    return clean.isNotEmpty ? clean : name;
+  }
+
+  /// Conditionnement extrait : Boîte ou Flacon de combien (ex: "Boîte de 30", "Flacon de 60ml")
+  String get packaging {
+    final regex = RegExp(
+      r'\b(Bt\s*\d+[^\s,]*|\bFl\s*\d+[^\s,]*|\bTb\s*\d+[^\s,]*|\bFlacon[^\s,]*|\bPoche[^\s,]*|\bTube[^\s,]*|\bAmp\.?\s*\d+[^\s,]*|\bStylos?\s*\d+[^\s,]*)',
+      caseSensitive: false,
+    );
+    final match = regex.firstMatch(name);
+    if (match == null) return '';
+
+    final raw = match.group(0)!.trim();
+    final btMatch = RegExp(r'^Bt\s*(.+)$', caseSensitive: false).firstMatch(raw);
+    if (btMatch != null) return 'Boîte de ${btMatch.group(1)}';
+
+    final flMatch = RegExp(r'^Fl\s*(.+)$', caseSensitive: false).firstMatch(raw);
+    if (flMatch != null) return 'Flacon de ${flMatch.group(1)}';
+
+    final tbMatch = RegExp(r'^Tb\s*(.+)$', caseSensitive: false).firstMatch(raw);
+    if (tbMatch != null) return 'Tube de ${tbMatch.group(1)}';
+
+    return raw;
+  }
+
+  /// Affichage compact médical : Nom commercial + Forme + Conditionnement
+  String get cleanDisplayLabel {
+    final pkg = packaging;
+    final f = form.trim();
+    if (pkg.isNotEmpty && f.isNotEmpty) {
+      return '$cleanCommercialName - $f ($pkg)';
+    } else if (f.isNotEmpty) {
+      return '$cleanCommercialName - $f';
+    } else if (pkg.isNotEmpty) {
+      return '$cleanCommercialName ($pkg)';
+    }
+    return cleanCommercialName;
+  }
 }
 
-/// Service de gestion et de recherche instantanée dans les 5 112 médicaments de la base de référence
+/// Service de recherche dans la base des médicaments
 class MedicinesCatalogService {
   static final MedicinesCatalogService instance = MedicinesCatalogService._internal();
   MedicinesCatalogService._internal();
@@ -68,8 +118,8 @@ class MedicinesCatalogService {
     return _catalog ?? [];
   }
 
-  /// Recherche instantanée multi-mots clés sur le Nom, la DCI ou le Laboratoire
-  Future<List<CatalogMedicine>> search(String query, {int limit = 50}) async {
+  /// Recherche par nom commercial, DCI ou laboratoire
+  Future<List<CatalogMedicine>> search(String query, {int limit = 60}) async {
     final catalog = await loadCatalog();
     final q = query.trim().toLowerCase();
 
@@ -79,12 +129,9 @@ class MedicinesCatalogService {
 
     final words = q.split(' ').where((w) => w.isNotEmpty).toList();
 
-    final results = catalog.where((med) {
-      final text = '${med.name} ${med.dci} ${med.laboratory} ${med.therapeuticClass}'.toLowerCase();
-      // Tous les mots de recherche doivent être présents
+    return catalog.where((med) {
+      final text = '${med.name} ${med.cleanCommercialName} ${med.dci} ${med.form}'.toLowerCase();
       return words.every((w) => text.contains(w));
     }).take(limit).toList();
-
-    return results;
   }
 }

@@ -241,11 +241,16 @@ class _MedicineDetailViewState extends State<MedicineDetailView> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: const TextStyle(color: AppColors.slateMedium, fontSize: 13.5)),
-          Text(
-            value.isEmpty ? '-' : value,
-            style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.slateDark, fontSize: 13.5),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value.isEmpty ? '-' : value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.slateDark, fontSize: 13.5),
+            ),
           ),
         ],
       ),

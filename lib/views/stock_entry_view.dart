@@ -10,7 +10,8 @@ import 'widgets/big_touch_button.dart';
 import 'widgets/camera_scanner_modal.dart';
 import 'widgets/medicine_catalog_picker.dart';
 
-/// Écran Entrée en Stock (Réception) avec assignation directe à la base de données médicaments
+/// Écran Entrée en Stock (Réception)
+/// Affichage épuré : SEULEMENT Nom Commercial, Forme et Boîte/Flacon
 class StockEntryView extends StatefulWidget {
   final String? initialBarcode;
 
@@ -25,11 +26,8 @@ class _StockEntryViewState extends State<StockEntryView> {
 
   final _cipController = TextEditingController();
   final _nameController = TextEditingController();
-  final _dciController = TextEditingController();
-  final _dosageController = TextEditingController();
   final _formGaleniqueController = TextEditingController();
-  final _classController = TextEditingController();
-  final _labController = TextEditingController();
+  final _packagingController = TextEditingController();
 
   final _batchController = TextEditingController();
   final _expiryController = TextEditingController();
@@ -48,7 +46,7 @@ class _StockEntryViewState extends State<StockEntryView> {
     super.initState();
     BarcodeHardwareListener.instance.addListener(_onBarcodeScanned);
 
-    // Pré-charger le catalogue des 5 112 médicaments
+    // Pré-chargement silencieux du catalogue des médicaments
     MedicinesCatalogService.instance.loadCatalog();
 
     if (widget.initialBarcode != null) {
@@ -63,11 +61,8 @@ class _StockEntryViewState extends State<StockEntryView> {
     BarcodeHardwareListener.instance.removeListener(_onBarcodeScanned);
     _cipController.dispose();
     _nameController.dispose();
-    _dciController.dispose();
-    _dosageController.dispose();
     _formGaleniqueController.dispose();
-    _classController.dispose();
-    _labController.dispose();
+    _packagingController.dispose();
     _batchController.dispose();
     _expiryController.dispose();
     _quantityController.dispose();
@@ -99,7 +94,7 @@ class _StockEntryViewState extends State<StockEntryView> {
       _serialController.text = parsed.serialNumber!;
     }
 
-    // Vérifier si le GTIN est déjà assigné à un médicament dans le stock
+    // Vérifier si le code est déjà mémorisé dans le cabinet
     final found = await DatabaseService.instance.getMedicineByGtin(gtin);
 
     if (found != null) {
@@ -110,19 +105,15 @@ class _StockEntryViewState extends State<StockEntryView> {
         _quantityFocusNode.requestFocus();
       }
     } else {
-      // Code non encore assigné : proposer immédiatement la sélection dans le catalogue
+      // Code non encore assigné : ouvrir directement la sélection de la base
       _isAssigned = false;
       _existingMedicine = null;
       _nameController.clear();
-      _dciController.clear();
-      _dosageController.clear();
       _formGaleniqueController.clear();
-      _classController.clear();
-      _labController.clear();
+      _packagingController.clear();
 
       setState(() => _isLoading = false);
 
-      // Ouvrir automatiquement la recherche dans le catalogue
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _openCatalogPicker();
       });
@@ -136,11 +127,8 @@ class _StockEntryViewState extends State<StockEntryView> {
     _existingMedicine = med;
     _isAssigned = true;
     _nameController.text = med.commercialName;
-    _dciController.text = med.dci;
-    _dosageController.text = med.dosage;
     _formGaleniqueController.text = med.form;
-    _classController.text = med.therapeuticClass;
-    _labController.text = med.laboratory;
+    _packagingController.text = med.dosage; // Contient le conditionnement (Boîte ou Flacon)
   }
 
   Future<void> _openCatalogPicker() async {
@@ -151,20 +139,17 @@ class _StockEntryViewState extends State<StockEntryView> {
         final gtin = _cipController.text.trim().isEmpty ? 'CODE_${now.millisecondsSinceEpoch}' : _cipController.text.trim();
 
         _cipController.text = gtin;
-        _nameController.text = selected.name;
-        _dciController.text = selected.dci;
-        _dosageController.text = selected.dosage;
+        _nameController.text = selected.cleanCommercialName;
         _formGaleniqueController.text = selected.form;
-        _classController.text = selected.therapeuticClass;
-        _labController.text = selected.laboratory;
+        _packagingController.text = selected.packaging;
         _isAssigned = true;
 
         _existingMedicine = Medicine(
           id: 'med_${DateTime.now().millisecondsSinceEpoch}',
           cipGtin: gtin,
-          commercialName: selected.name,
+          commercialName: selected.cleanCommercialName,
           dci: selected.dci,
-          dosage: selected.dosage,
+          dosage: selected.packaging,
           form: selected.form,
           therapeuticClass: selected.therapeuticClass,
           laboratory: selected.laboratory,
@@ -208,7 +193,7 @@ class _StockEntryViewState extends State<StockEntryView> {
     if (!_isAssigned || _nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez assigner ce code à un médicament de la base de données.'),
+          content: Text('Veuillez choisir un médicament dans la base de données.'),
           backgroundColor: AppColors.alertWarning,
         ),
       );
@@ -236,22 +221,19 @@ class _StockEntryViewState extends State<StockEntryView> {
 
       final medicine = _existingMedicine?.copyWith(
             commercialName: _nameController.text.trim(),
-            dci: _dciController.text.trim(),
-            dosage: _dosageController.text.trim(),
             form: _formGaleniqueController.text.trim(),
-            therapeuticClass: _classController.text.trim(),
-            laboratory: _labController.text.trim(),
+            dosage: _packagingController.text.trim(),
             updatedAt: now,
           ) ??
           Medicine(
             id: 'med_${DateTime.now().millisecondsSinceEpoch}',
             cipGtin: gtin,
             commercialName: _nameController.text.trim(),
-            dci: _dciController.text.trim(),
-            dosage: _dosageController.text.trim(),
+            dci: '',
+            dosage: _packagingController.text.trim(),
             form: _formGaleniqueController.text.trim(),
-            therapeuticClass: _classController.text.trim(),
-            laboratory: _labController.text.trim(),
+            therapeuticClass: '',
+            laboratory: '',
             createdAt: now,
             updatedAt: now,
           );
@@ -265,14 +247,15 @@ class _StockEntryViewState extends State<StockEntryView> {
         expiryDate: expiryValidation.parsedDate!,
         quantity: qty,
         serialNumber: _serialController.text.trim().isEmpty ? null : _serialController.text.trim(),
-        note: 'Réception délégué (${medicine.laboratory})',
+        note: 'Réception échantillon',
       );
 
       if (mounted) {
+        final pkg = _packagingController.text.isNotEmpty ? ' (${_packagingController.text})' : '';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Enregistré : +$qty boîte(s) de ${medicine.commercialName} (Lot: $batchNo - Exp: ${_expiryController.text})',
+              'Enregistré : +$qty de ${medicine.commercialName}$pkg [Lot: $batchNo • Exp: ${_expiryController.text}]',
             ),
             backgroundColor: AppColors.alertValid,
           ),
@@ -326,7 +309,7 @@ class _StockEntryViewState extends State<StockEntryView> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.barcode_reader, color: AppColors.primaryBlue, size: 30),
+                          const Icon(Icons.barcode_reader, color: AppColors.primaryBlue, size: 28),
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Column(
@@ -337,11 +320,11 @@ class _StockEntryViewState extends State<StockEntryView> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.primaryDark,
-                                    fontSize: 14.5,
+                                    fontSize: 14,
                                   ),
                                 ),
                                 Text(
-                                  'Scannez avec la douchette USB ou la caméra pour démarrer.',
+                                  'Douchette USB ou caméra mobile active',
                                   style: TextStyle(color: AppColors.slateMedium, fontSize: 12),
                                 ),
                               ],
@@ -360,9 +343,9 @@ class _StockEntryViewState extends State<StockEntryView> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
 
-                    // Champ Code GTIN / CIP scanné
+                    // Champ Code
                     TextFormField(
                       controller: _cipController,
                       decoration: InputDecoration(
@@ -377,163 +360,152 @@ class _StockEntryViewState extends State<StockEntryView> {
                         filled: true,
                         fillColor: Colors.white,
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Le code est requis' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Code obligatoire' : null,
                     ),
                     const SizedBox(height: 14),
 
-                    // Bouton d'assignation au catalogue
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: _isAssigned ? AppColors.alertValidLight : AppColors.alertWarningLight,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: (_isAssigned ? AppColors.alertValid : AppColors.alertWarning).withValues(alpha: 0.4),
+                    // Section Assignation épurée : SEULEMENT Nom Commercial, Forme et Boîte/Flacon
+                    if (_isAssigned)
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: AppColors.alertValid.withValues(alpha: 0.5), width: 1.5),
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                        elevation: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                _isAssigned ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-                                color: _isAssigned ? AppColors.alertValid : AppColors.alertWarning,
-                                size: 22,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _isAssigned
-                                      ? 'Médicament assigné : ${_nameController.text}'
-                                      : 'Code non assigné : choisissez le médicament dans la base',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: _isAssigned ? AppColors.alertValid : AppColors.alertWarning,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded, color: AppColors.alertValid, size: 22),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Médicament Assigné',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green.shade800,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _openCatalogPicker,
-                              icon: const Icon(Icons.manage_search_rounded),
-                              label: Text(
-                                _isAssigned
-                                    ? 'Changer le médicament assigné (5 063 dans la base)'
-                                    : 'Assigner à un médicament de la base (5 063 médicaments)',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _isAssigned ? AppColors.slateDark : AppColors.primaryBlue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Fiche du médicament sélectionné
-                    Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 1.5,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Détails du Médicament',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.slateDark,
-                                  ),
-                                ),
-                                if (_isAssigned)
-                                  const Text(
-                                    'Base officielle',
-                                    style: TextStyle(
-                                      color: AppColors.primaryBlue,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
+                                  TextButton.icon(
+                                    onPressed: _openCatalogPicker,
+                                    icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                                    label: const Text('Changer'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.primaryBlue,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     ),
                                   ),
-                              ],
-                            ),
-                            const Divider(height: 20),
-                            TextFormField(
-                              controller: _nameController,
-                              readOnly: _isAssigned,
-                              decoration: const InputDecoration(
-                                labelText: 'Nom commercial *',
-                                prefixIcon: Icon(Icons.medication_rounded),
+                                ],
                               ),
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Le nom est obligatoire' : null,
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _dciController,
-                                    readOnly: _isAssigned,
-                                    decoration: const InputDecoration(labelText: 'DCI (Principe actif)'),
-                                  ),
+                              const Divider(height: 16),
+
+                              // 1. NOM COMMERCIAL
+                              Text(
+                                _nameController.text,
+                                style: const TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.slateDark,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _dosageController,
-                                    readOnly: _isAssigned,
-                                    decoration: const InputDecoration(labelText: 'Dosage / Présentation'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _formGaleniqueController,
-                                    readOnly: _isAssigned,
-                                    decoration: const InputDecoration(labelText: 'Forme galénique'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _labController,
-                                    readOnly: _isAssigned,
-                                    decoration: const InputDecoration(labelText: 'Laboratoire'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_classController.text.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _classController,
-                                readOnly: _isAssigned,
-                                decoration: const InputDecoration(labelText: 'Classe thérapeutique'),
+                              ),
+                              const SizedBox(height: 8),
+
+                              // 2. FORME & 3. BOITE OU FLACON DE COMBIEN
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  if (_formGaleniqueController.text.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.blue.shade200),
+                                      ),
+                                      child: Text(
+                                        _formGaleniqueController.text,
+                                        style: TextStyle(
+                                          color: Colors.blue.shade900,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  if (_packagingController.text.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.teal.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.teal.shade200),
+                                      ),
+                                      child: Text(
+                                        _packagingController.text,
+                                        style: TextStyle(
+                                          color: Colors.teal.shade900,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.alertWarningLight,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.alertWarning.withValues(alpha: 0.4)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded, color: AppColors.alertWarning),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Code non assigné : veuillez sélectionner le médicament dans la base.',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.alertWarning),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _openCatalogPicker,
+                                icon: const Icon(Icons.manage_search_rounded),
+                                label: const Text(
+                                  'Choisir le médicament dans la base',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryBlue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
                     const SizedBox(height: 16),
 
                     // Carte Lot et Péremption
@@ -564,7 +536,7 @@ class _StockEntryViewState extends State<StockEntryView> {
                                       hintText: 'ex: LOT-2026-X',
                                       prefixIcon: Icon(Icons.tag_rounded),
                                     ),
-                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Numéro de lot requis' : null,
+                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'N° de lot requis' : null,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -591,7 +563,7 @@ class _StockEntryViewState extends State<StockEntryView> {
                             TextFormField(
                               controller: _serialController,
                               decoration: const InputDecoration(
-                                labelText: 'Numéro de série unitaire (Optionnel)',
+                                labelText: 'N° de Série unitaire (Optionnel / DataMatrix)',
                                 prefixIcon: Icon(Icons.fingerprint_rounded),
                               ),
                             ),
@@ -690,7 +662,7 @@ class _StockEntryViewState extends State<StockEntryView> {
                     ),
                     const SizedBox(height: 26),
 
-                    // Gros bouton tactile de validation
+                    // Validation
                     BigTouchButton(
                       label: 'Valider l\'Entrée en Stock',
                       subtitle: 'Incrémente le stock avec le lot et la date de péremption',
