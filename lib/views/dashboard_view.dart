@@ -14,6 +14,7 @@ import 'widgets/alert_badge.dart';
 import 'widgets/big_touch_button.dart';
 import 'widgets/camera_scanner_modal.dart';
 import 'widgets/medicine_catalog_picker.dart';
+import 'widgets/about_dialog.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
 class DashboardView extends StatefulWidget {
@@ -267,11 +268,19 @@ class _DashboardViewState extends State<DashboardView> {
               }
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded, color: AppColors.primaryBlue, size: 24),
+            tooltip: 'À propos & Mises à jour',
+            onPressed: () => AboutDocPocketDialog.show(context),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppColors.slateDark),
             tooltip: 'Outils & Rapports',
             onSelected: (val) {
               switch (val) {
+                case 'about':
+                  AboutDocPocketDialog.show(context);
+                  break;
                 case 'pdf_inventory':
                   PdfReportService.printInventoryReport(_medicines);
                   break;
@@ -296,6 +305,17 @@ class _DashboardViewState extends State<DashboardView> {
               }
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'about',
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: AppColors.primaryBlue),
+                    SizedBox(width: 10),
+                    Text('À propos & Mises à jour (APK)'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
               const PopupMenuItem(
                 value: 'pdf_inventory',
                 child: Row(

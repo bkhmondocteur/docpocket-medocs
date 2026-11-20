@@ -12,7 +12,7 @@ class PdfReportService {
   static Future<void> printInventoryReport(List<Medicine> medicines) async {
     final pdf = pw.Document();
     final now = DateTime.now();
-    final dateStr = StrictDateValidator.format(now);
+    final dateStr = StrictDateValidator.formatFull(now);
 
     int totalBoxes = medicines.fold(0, (s, m) => s + m.totalStock);
 
@@ -61,7 +61,7 @@ class PdfReportService {
   static Future<void> printAlertsReport(List<Medicine> medicines) async {
     final pdf = pw.Document();
     final now = DateTime.now();
-    final dateStr = StrictDateValidator.format(now);
+    final dateStr = StrictDateValidator.formatFull(now);
 
     // Filtrer uniquement les médicaments avec des lots périmés ou proches de péremption
     final alertBatches = <Map<String, dynamic>>[];

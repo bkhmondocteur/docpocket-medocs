@@ -547,8 +547,8 @@ class _StockEntryViewState extends State<StockEntryView> {
                                     keyboardType: TextInputType.number,
                                     inputFormatters: [StrictDateInputFormatter()],
                                     decoration: const InputDecoration(
-                                      labelText: 'Péremption * (jj/mm/aaaa)',
-                                      hintText: '31/12/2026',
+                                      labelText: 'Péremption * (MM/AAAA)',
+                                      hintText: 'ex: 11/2028',
                                       prefixIcon: Icon(Icons.calendar_month_rounded),
                                     ),
                                     validator: (v) {
