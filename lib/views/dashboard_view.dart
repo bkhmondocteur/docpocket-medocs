@@ -18,6 +18,7 @@ import 'widgets/about_dialog.dart';
 import 'widgets/auto_backup_dialog.dart';
 import 'widgets/add_batch_dialog.dart';
 import 'widgets/add_boxes_dialog.dart';
+import 'widgets/create_custom_medicine_dialog.dart';
 import '../../core/services/auto_backup_service.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
@@ -339,6 +340,9 @@ class _DashboardViewState extends State<DashboardView> {
                 case 'catalog':
                   MedicineCatalogPickerDialog.show(context);
                   break;
+                case 'custom_med':
+                  CreateCustomMedicineDialog.show(context);
+                  break;
                 case 'export_json':
                   _exportBackupJson();
                   break;
@@ -402,6 +406,16 @@ class _DashboardViewState extends State<DashboardView> {
                     Icon(Icons.menu_book_rounded, color: AppColors.primaryDark),
                     SizedBox(width: 10),
                     Text('Dictionnaire Médicaments (5 063)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'custom_med',
+                child: Row(
+                  children: [
+                    Icon(Icons.playlist_add_rounded, color: AppColors.primaryBlue),
+                    SizedBox(width: 10),
+                    Text('Ajouter médicament hors base'),
                   ],
                 ),
               ),

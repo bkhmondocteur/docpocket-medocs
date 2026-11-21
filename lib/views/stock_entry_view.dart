@@ -8,6 +8,7 @@ import '../../core/services/medicines_catalog_service.dart';
 import '../../models/medicine.dart';
 import 'widgets/big_touch_button.dart';
 import 'widgets/camera_scanner_modal.dart';
+import 'widgets/create_custom_medicine_dialog.dart';
 import 'widgets/medicine_catalog_picker.dart';
 
 /// Écran Entrée en Stock (Réception)
@@ -39,6 +40,8 @@ class _StockEntryViewState extends State<StockEntryView> {
 
   bool _isAssigned = false;
   Medicine? _existingMedicine;
+  String _dci = '';
+  String _laboratory = '';
   bool _isLoading = false;
 
   @override
@@ -129,48 +132,66 @@ class _StockEntryViewState extends State<StockEntryView> {
     _nameController.text = med.commercialName;
     _formGaleniqueController.text = med.form;
     _packagingController.text = med.dosage; // Contient le conditionnement (Boîte ou Flacon)
+    _dci = med.dci;
+    _laboratory = med.laboratory;
+  }
+
+  void _applyCatalogMedicine(CatalogMedicine selected) {
+    setState(() {
+      final now = DateTime.now();
+      final gtin = _cipController.text.trim().isEmpty ? 'CODE_${now.millisecondsSinceEpoch}' : _cipController.text.trim();
+
+      _cipController.text = gtin;
+      _nameController.text = selected.cleanCommercialName;
+      _formGaleniqueController.text = selected.form;
+      _packagingController.text = selected.packaging;
+      _dci = selected.dci;
+      _laboratory = selected.laboratory;
+      _isAssigned = true;
+
+      final match = DatabaseService.instance.findExistingMedicine(
+        commercialName: selected.cleanCommercialName,
+        form: selected.form,
+        dosage: selected.packaging,
+        cipGtin: gtin,
+      );
+
+      _existingMedicine = match ??
+          Medicine(
+            id: 'med_${DateTime.now().millisecondsSinceEpoch}',
+            cipGtin: gtin,
+            commercialName: selected.cleanCommercialName,
+            dci: selected.dci,
+            dosage: selected.packaging,
+            form: selected.form,
+            therapeuticClass: selected.therapeuticClass,
+            laboratory: selected.laboratory,
+            createdAt: now,
+            updatedAt: now,
+          );
+    });
+
+    if (_expiryController.text.isEmpty) {
+      _expiryFocusNode.requestFocus();
+    } else {
+      _quantityFocusNode.requestFocus();
+    }
   }
 
   Future<void> _openCatalogPicker() async {
     final selected = await MedicineCatalogPickerDialog.show(context, initialQuery: _nameController.text);
     if (selected != null && mounted) {
-      setState(() {
-        final now = DateTime.now();
-        final gtin = _cipController.text.trim().isEmpty ? 'CODE_${now.millisecondsSinceEpoch}' : _cipController.text.trim();
+      _applyCatalogMedicine(selected);
+    }
+  }
 
-        _cipController.text = gtin;
-        _nameController.text = selected.cleanCommercialName;
-        _formGaleniqueController.text = selected.form;
-        _packagingController.text = selected.packaging;
-        _isAssigned = true;
-
-        final match = DatabaseService.instance.findExistingMedicine(
-          commercialName: selected.cleanCommercialName,
-          form: selected.form,
-          dosage: selected.packaging,
-          cipGtin: gtin,
-        );
-
-        _existingMedicine = match ??
-            Medicine(
-              id: 'med_${DateTime.now().millisecondsSinceEpoch}',
-              cipGtin: gtin,
-              commercialName: selected.cleanCommercialName,
-              dci: selected.dci,
-              dosage: selected.packaging,
-              form: selected.form,
-              therapeuticClass: selected.therapeuticClass,
-              laboratory: selected.laboratory,
-              createdAt: now,
-              updatedAt: now,
-            );
-      });
-
-      if (_expiryController.text.isEmpty) {
-        _expiryFocusNode.requestFocus();
-      } else {
-        _quantityFocusNode.requestFocus();
-      }
+  Future<void> _openCreateCustomMedicineDialog() async {
+    final created = await CreateCustomMedicineDialog.show(
+      context,
+      initialName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
+    );
+    if (created != null && mounted) {
+      _applyCatalogMedicine(created);
     }
   }
 
@@ -231,17 +252,19 @@ class _StockEntryViewState extends State<StockEntryView> {
             commercialName: _nameController.text.trim(),
             form: _formGaleniqueController.text.trim(),
             dosage: _packagingController.text.trim(),
+            dci: _dci.isNotEmpty ? _dci : _existingMedicine?.dci,
+            laboratory: _laboratory.isNotEmpty ? _laboratory : _existingMedicine?.laboratory,
             updatedAt: now,
           ) ??
           Medicine(
             id: 'med_${DateTime.now().millisecondsSinceEpoch}',
             cipGtin: gtin,
             commercialName: _nameController.text.trim(),
-            dci: '',
+            dci: _dci,
             dosage: _packagingController.text.trim(),
             form: _formGaleniqueController.text.trim(),
             therapeuticClass: '',
-            laboratory: '',
+            laboratory: _laboratory,
             createdAt: now,
             updatedAt: now,
           );
@@ -402,14 +425,28 @@ class _StockEntryViewState extends State<StockEntryView> {
                                       ),
                                     ],
                                   ),
-                                  TextButton.icon(
-                                    onPressed: _openCatalogPicker,
-                                    icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                                    label: const Text('Changer'),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: AppColors.primaryBlue,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    ),
+                                  Row(
+                                    children: [
+                                      TextButton.icon(
+                                        onPressed: _openCatalogPicker,
+                                        icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                                        label: const Text('Changer'),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: AppColors.primaryBlue,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      TextButton.icon(
+                                        onPressed: _openCreateCustomMedicineDialog,
+                                        icon: const Icon(Icons.add_rounded, size: 18),
+                                        label: const Text('Nouveau'),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: AppColors.primaryDark,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -426,7 +463,7 @@ class _StockEntryViewState extends State<StockEntryView> {
                               ),
                               const SizedBox(height: 8),
 
-                              // 2. FORME & 3. BOITE OU FLACON DE COMBIEN
+                              // 2. FORME & 3. BOITE OU FLACON DE COMBIEN (+ DCI / Labo)
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 6,
@@ -465,6 +502,38 @@ class _StockEntryViewState extends State<StockEntryView> {
                                         ),
                                       ),
                                     ),
+                                  if (_dci.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.purple.shade200),
+                                      ),
+                                      child: Text(
+                                        'DCI: $_dci',
+                                        style: TextStyle(
+                                          color: Colors.purple.shade900,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  if (_laboratory.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.indigo.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.indigo.shade200),
+                                      ),
+                                      child: Text(
+                                        'Lab: $_laboratory',
+                                        style: TextStyle(
+                                          color: Colors.indigo.shade900,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ],
@@ -487,7 +556,7 @@ class _StockEntryViewState extends State<StockEntryView> {
                                 SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Code non assigné : veuillez sélectionner le médicament dans la base.',
+                                    'Code non assigné : sélectionnez le médicament dans la base ou créez-le s\'il est introuvable.',
                                     style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.alertWarning),
                                   ),
                                 ),
@@ -507,6 +576,24 @@ class _StockEntryViewState extends State<StockEntryView> {
                                   backgroundColor: AppColors.primaryBlue,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 13),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _openCreateCustomMedicineDialog,
+                                icon: const Icon(Icons.add_circle_outline_rounded),
+                                label: const Text(
+                                  'Médicament hors base ? Ajouter manuellement',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryBlue,
+                                  side: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                               ),

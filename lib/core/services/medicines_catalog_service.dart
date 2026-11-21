@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Modèle d'un médicament du dictionnaire de référence pharmaceutique
 class CatalogMedicine {
@@ -10,6 +11,9 @@ class CatalogMedicine {
   final String therapeuticClass;  // Famille thérapeutique
   final String dosage;            // Dosage
   final String price;             // Prix public
+  final String? customName;       // Nom personnalisé
+  final String? customPackaging;  // Conditionnement personnalisé (ex: "Boîte de 10" ou "Flacon de 100 ml")
+  final bool isCustom;            // Indicateur si créé manuellement par l'utilisateur
 
   const CatalogMedicine({
     required this.name,
@@ -19,6 +23,9 @@ class CatalogMedicine {
     required this.therapeuticClass,
     required this.dosage,
     required this.price,
+    this.customName,
+    this.customPackaging,
+    this.isCustom = false,
   });
 
   factory CatalogMedicine.fromMap(Map<String, dynamic> map) {
@@ -30,14 +37,33 @@ class CatalogMedicine {
       therapeuticClass: map['c']?.toString() ?? '',
       dosage: map['dos']?.toString() ?? '',
       price: map['p']?.toString() ?? '',
+      customName: map['cn']?.toString(),
+      customPackaging: map['cp']?.toString(),
+      isCustom: map['is_custom'] == true,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'n': name,
+      'd': dci,
+      'f': form,
+      'l': laboratory,
+      'c': therapeuticClass,
+      'dos': dosage,
+      'p': price,
+      'cn': customName,
+      'cp': customPackaging,
+      'is_custom': isCustom,
+    };
   }
 
   /// Nom commercial épuré (ex: DOLIPRANE 1000mg)
   String get cleanCommercialName {
-    // Si dosage explicite et absent du début du nom, on garde la racine
+    if (isCustom && customName != null && customName!.trim().isNotEmpty) {
+      return customName!.trim();
+    }
     var clean = name;
-    // Supprimer les suffixes de forme abrégée et conditionnement (ex: Comp. Bt 30, Susp.or. Fl 60ml)
     final regex = RegExp(
       r'\s+(Comp|Gel|Susp|Pdre|Sol|Crm|Pde|Srp|Collyre|Gttes|Amp|Supp|Past|Emuls|Glé|Shamp|Caps)\b.*$',
       caseSensitive: false,
@@ -49,6 +75,9 @@ class CatalogMedicine {
 
   /// Conditionnement extrait : Boîte ou Flacon de combien (ex: "Boîte de 30", "Flacon de 60ml")
   String get packaging {
+    if (isCustom && customPackaging != null && customPackaging!.trim().isNotEmpty) {
+      return customPackaging!.trim();
+    }
     final regex = RegExp(
       r'\b(Bt\s*\d+[^\s,]*|\bFl\s*\d+[^\s,]*|\bTb\s*\d+[^\s,]*|\bFlacon[^\s,]*|\bPoche[^\s,]*|\bTube[^\s,]*|\bAmp\.?\s*\d+[^\s,]*|\bStylos?\s*\d+[^\s,]*)',
       caseSensitive: false,
@@ -84,12 +113,14 @@ class CatalogMedicine {
   }
 }
 
-/// Service de recherche dans la base des médicaments
+/// Service de recherche dans la base des médicaments (officielle + personnalisée)
 class MedicinesCatalogService {
   static final MedicinesCatalogService instance = MedicinesCatalogService._internal();
   MedicinesCatalogService._internal();
 
+  static const String _prefKeyCustomMeds = 'docpocket_custom_catalog_medicines_v2';
   List<CatalogMedicine>? _catalog;
+  final List<CatalogMedicine> _customCatalog = [];
   bool _isLoading = false;
 
   bool get isLoaded => _catalog != null;
@@ -106,16 +137,75 @@ class MedicinesCatalogService {
 
     _isLoading = true;
     try {
+      // 1. Charger la base officielle tunisienne
       final jsonString = await rootBundle.loadString('assets/data/medicines_database.json');
       final list = json.decode(jsonString) as List<dynamic>;
-      _catalog = list.map((item) => CatalogMedicine.fromMap(item as Map<String, dynamic>)).toList();
+      final baseCatalog = list.map((item) => CatalogMedicine.fromMap(item as Map<String, dynamic>)).toList();
+
+      // 2. Charger les médicaments personnalisés ajoutés par le médecin
+      final prefs = await SharedPreferences.getInstance();
+      final customJson = prefs.getString(_prefKeyCustomMeds);
+      _customCatalog.clear();
+      if (customJson != null && customJson.isNotEmpty) {
+        try {
+          final customList = json.decode(customJson) as List<dynamic>;
+          for (final item in customList) {
+            _customCatalog.add(CatalogMedicine.fromMap(item as Map<String, dynamic>));
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fusionner (les médicaments personnalisés sont en tête)
+      _catalog = [..._customCatalog, ...baseCatalog];
     } catch (e) {
-      _catalog = [];
+      _catalog = [..._customCatalog];
     } finally {
       _isLoading = false;
     }
 
     return _catalog ?? [];
+  }
+
+  /// Ajoute un nouveau médicament personnalisé créé par l'utilisateur
+  Future<CatalogMedicine> addCustomMedicine({
+    required String commercialName,
+    required String dci,
+    required String form,
+    required String packagingOrVolume,
+    required String laboratory,
+    String therapeuticClass = '',
+  }) async {
+    await loadCatalog();
+
+    final customMed = CatalogMedicine(
+      name: '$commercialName $form $packagingOrVolume'.trim(),
+      dci: dci.trim(),
+      form: form.trim(),
+      laboratory: laboratory.trim(),
+      therapeuticClass: therapeuticClass.trim(),
+      dosage: packagingOrVolume.trim(),
+      price: '',
+      customName: commercialName.trim(),
+      customPackaging: packagingOrVolume.trim(),
+      isCustom: true,
+    );
+
+    // Éviter les doublons exacts dans le catalogue personnalisé
+    _customCatalog.removeWhere((m) =>
+        m.cleanCommercialName.toLowerCase() == customMed.cleanCommercialName.toLowerCase() &&
+        m.form.toLowerCase() == customMed.form.toLowerCase() &&
+        m.packaging.toLowerCase() == customMed.packaging.toLowerCase());
+
+    _customCatalog.insert(0, customMed);
+    _catalog?.insert(0, customMed);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = _customCatalog.map((m) => m.toMap()).toList();
+      await prefs.setString(_prefKeyCustomMeds, json.encode(jsonList));
+    } catch (_) {}
+
+    return customMed;
   }
 
   /// Recherche par nom commercial, DCI ou laboratoire
@@ -130,7 +220,7 @@ class MedicinesCatalogService {
     final words = q.split(' ').where((w) => w.isNotEmpty).toList();
 
     return catalog.where((med) {
-      final text = '${med.name} ${med.cleanCommercialName} ${med.dci} ${med.form}'.toLowerCase();
+      final text = '${med.name} ${med.cleanCommercialName} ${med.dci} ${med.form} ${med.laboratory}'.toLowerCase();
       return words.every((w) => text.contains(w));
     }).take(limit).toList();
   }

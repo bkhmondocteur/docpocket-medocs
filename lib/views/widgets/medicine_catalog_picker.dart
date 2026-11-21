@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/medicines_catalog_service.dart';
+import 'create_custom_medicine_dialog.dart';
 
 /// Boîte de dialogue de sélection épurée : affiche SEULEMENT le nom commercial, la forme et boîte/flacon
 class MedicineCatalogPickerDialog extends StatefulWidget {
@@ -116,14 +117,38 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
             ),
             const SizedBox(height: 10),
 
-            // Compteur de résultats
-            Text(
-              _isLoading
-                  ? 'Recherche en cours...'
-                  : '${_results.length} médicament(s) affiché(s)',
-              style: const TextStyle(fontSize: 12, color: AppColors.slateMedium, fontStyle: FontStyle.italic),
+            // Compteur de résultats & Bouton d'ajout manuel
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _isLoading
+                      ? 'Recherche en cours...'
+                      : '${_results.length} médicament(s) affiché(s)',
+                  style: const TextStyle(fontSize: 12, color: AppColors.slateMedium, fontStyle: FontStyle.italic),
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: AppColors.primaryBlue,
+                  ),
+                  onPressed: () async {
+                    final nav = Navigator.of(context);
+                    final query = _searchController.text;
+                    final created = await CreateCustomMedicineDialog.show(
+                      context,
+                      initialName: query,
+                    );
+                    if (created != null) {
+                      nav.pop(created);
+                    }
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('+ Non répertorié', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             const Divider(),
 
             // Liste épurée : SEULEMENT Nom Commercial, Forme, et Boîte ou Flacon
@@ -131,10 +156,51 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _results.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Aucun médicament correspondant.',
-                            style: TextStyle(color: AppColors.slateMedium),
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.search_off_rounded, size: 48, color: Colors.grey.shade400),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _searchController.text.trim().isEmpty
+                                      ? 'Aucun médicament trouvé.'
+                                      : 'Aucun résultat pour "${_searchController.text}"',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Ce médicament n\'est pas dans la base de données ?\nVous pouvez créer sa fiche manuellement en quelques secondes.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: AppColors.slateMedium, fontSize: 13),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryBlue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  onPressed: () async {
+                                    final nav = Navigator.of(context);
+                                    final query = _searchController.text;
+                                    final created = await CreateCustomMedicineDialog.show(
+                                      context,
+                                      initialName: query,
+                                    );
+                                    if (created != null) {
+                                      nav.pop(created);
+                                    }
+                                  },
+                                  icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                                  label: const Text('Créer et ajouter ce médicament'),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : ListView.separated(
