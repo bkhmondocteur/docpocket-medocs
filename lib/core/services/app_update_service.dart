@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,22 +25,24 @@ class AppReleaseInfo {
   });
 }
 
-/// Service de vérification des mises à jour depuis GitHub Releases
+/// Service de vérification et de téléchargement des mises à jour depuis GitHub Releases
 class AppUpdateService {
   static final AppUpdateService instance = AppUpdateService._internal();
   AppUpdateService._internal();
 
-  static const String currentVersion = '1.0.5';
-  static const int currentBuildNumber = 5;
+  static const String currentVersion = '1.0.6';
+  static const int currentBuildNumber = 7;
 
   static const String githubOwner = 'bkhmondocteur';
   static const String githubRepo = 'docpocket-medocs';
 
   static const String releasesUrl = 'https://github.com/$githubOwner/$githubRepo/releases';
+  static const String directApkDownloadUrl =
+      'https://github.com/$githubOwner/$githubRepo/releases/latest/download/app-release.apk';
   static const String latestReleaseApi =
       'https://api.github.com/repos/$githubOwner/$githubRepo/releases/latest';
 
-  /// Vérifie s'il existe une mise à jour sur GitHub
+  /// Vérifie s'il existe une mise à jour sur GitHub avec fallback résilient
   Future<AppReleaseInfo?> checkForUpdate() async {
     try {
       final response = await http
@@ -48,63 +52,103 @@ class AppUpdateService {
           )
           .timeout(const Duration(seconds: 8));
 
-      if (response.statusCode != 200) {
-        return null;
-      }
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final tagName = data['tag_name']?.toString() ?? 'v1.0.6';
+        final title = data['name']?.toString() ?? tagName;
+        final notes = data['body']?.toString() ?? '';
+        final htmlUrl = data['html_url']?.toString() ?? releasesUrl;
+        final publishedStr = data['published_at']?.toString();
+        final publishedAt = publishedStr != null ? DateTime.tryParse(publishedStr) : null;
 
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      final tagName = data['tag_name']?.toString() ?? 'v1.0.0';
-      final title = data['name']?.toString() ?? tagName;
-      final notes = data['body']?.toString() ?? '';
-      final htmlUrl = data['html_url']?.toString() ?? releasesUrl;
-      final publishedStr = data['published_at']?.toString();
-      final publishedAt = publishedStr != null ? DateTime.tryParse(publishedStr) : null;
-
-      // Chercher l'asset APK dans la release
-      String? apkUrl;
-      final assets = data['assets'] as List<dynamic>? ?? [];
-      for (final asset in assets) {
-        final name = asset['name']?.toString() ?? '';
-        if (name.endsWith('.apk')) {
-          apkUrl = asset['browser_download_url']?.toString();
-          break;
+        // Chercher l'asset APK dans la release
+        String? apkUrl;
+        final assets = data['assets'] as List<dynamic>? ?? [];
+        for (final asset in assets) {
+          final name = asset['name']?.toString() ?? '';
+          if (name.endsWith('.apk')) {
+            apkUrl = asset['browser_download_url']?.toString();
+            break;
+          }
         }
+
+        // Si pas d'apk spécifique, fallback vers l'URL de téléchargement direct de la release
+        apkUrl ??= 'https://github.com/$githubOwner/$githubRepo/releases/download/$tagName/app-release.apk';
+
+        final isNewer = _compareVersions(tagName, currentVersion) > 0;
+
+        return AppReleaseInfo(
+          tagName: tagName,
+          title: title,
+          notes: notes,
+          htmlUrl: htmlUrl,
+          apkDownloadUrl: apkUrl,
+          publishedAt: publishedAt,
+          isNewer: isNewer,
+        );
       }
+    } catch (e) {
+      debugPrint('CheckForUpdate API call error: $e');
+    }
 
-      // Si pas d'apk spécifique, fallback vers l'URL de téléchargement direct de la release
-      apkUrl ??= 'https://github.com/$githubOwner/$githubRepo/releases/download/$tagName/app-release.apk';
+    // Fallback résilient si GitHub API est indisponible ou rate-limité (60 req/h)
+    return const AppReleaseInfo(
+      tagName: 'Dernière version',
+      title: 'DocPocket Medocs APK',
+      notes: 'Téléchargement direct de la version la plus récente depuis GitHub.',
+      htmlUrl: releasesUrl,
+      apkDownloadUrl: directApkDownloadUrl,
+      publishedAt: null,
+      isNewer: false,
+    );
+  }
 
-      final isNewer = _compareVersions(tagName, currentVersion) > 0;
+  /// Ouvre l'URL dans le navigateur externe avec gestion multi-niveaux et tolérance aux pannes
+  Future<bool> openUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
 
-      return AppReleaseInfo(
-        tagName: tagName,
-        title: title,
-        notes: notes,
-        htmlUrl: htmlUrl,
-        apkDownloadUrl: apkUrl,
-        publishedAt: publishedAt,
-        isNewer: isNewer,
+      // Niveau 1 : Tenter d'ouvrir l'application externe (navigateur Chrome, Samsung Internet, Firefox...)
+      final launchedExternal = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
       );
-    } catch (_) {
-      return null;
+      if (launchedExternal) return true;
+
+      // Niveau 2 : Tenter avec le mode platformDefault
+      final launchedDefault = await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+      );
+      if (launchedDefault) return true;
+
+      // Niveau 3 : Tenter avec inAppBrowserView si externe échoue
+      return await launchUrl(
+        uri,
+        mode: LaunchMode.inAppBrowserView,
+      );
+    } catch (e) {
+      debugPrint('Erreur launchUrl pour $url : $e');
+      try {
+        // Ultime tentative directe sans mode spécifié
+        return await launchUrl(Uri.parse(url));
+      } catch (_) {
+        return false;
+      }
     }
   }
 
-  /// Ouvre l'URL de téléchargement direct ou la page de la release
-  Future<bool> openUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-    return false;
+  /// Copie l'URL dans le presse-papiers du smartphone/PC
+  Future<void> copyToClipboard(String url) async {
+    await Clipboard.setData(ClipboardData(text: url));
   }
 
   /// Ouvre la page générale des releases sur GitHub
-  Future<void> openReleasesPage() async {
-    await openUrl(releasesUrl);
+  Future<bool> openReleasesPage() async {
+    return await openUrl(releasesUrl);
   }
 
-  /// Compare deux tags de version (ex: 'v1.0.1' vs '1.0.0')
+  /// Compare deux tags de version (ex: 'v1.0.6' vs '1.0.5')
   /// Renvoie > 0 si v1 > v2, 0 si égal, < 0 si v1 < v2
   int _compareVersions(String v1, String v2) {
     final clean1 = v1.replaceAll(RegExp(r'[^0-9.]'), '');
