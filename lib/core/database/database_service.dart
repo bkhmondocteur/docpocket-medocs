@@ -4,6 +4,7 @@ import '../../models/medicine.dart';
 import '../../models/medicine_batch.dart';
 import '../../models/stock_movement.dart';
 import '../../models/stock_alert_level.dart';
+import '../services/auto_backup_service.dart';
 
 /// Service de stockage local 100% rapide, autonome et universel
 /// Compatible Web (PWA / localStorage), Windows, macOS et Mobile
@@ -102,6 +103,7 @@ class DatabaseService {
     _medicines.clear();
     _movements.clear();
     await _persist();
+    await AutoBackupService.instance.triggerAutoBackup();
   }
 
   // --------------------------------------------------------------------------
@@ -226,6 +228,7 @@ class DatabaseService {
       note: note ?? 'Réception délégué (${medicine.laboratory})',
     );
     await recordMovement(movement);
+    await AutoBackupService.instance.triggerAutoBackup();
   }
 
   // --------------------------------------------------------------------------
@@ -263,6 +266,7 @@ class DatabaseService {
       await recordMovement(movement);
     }
 
+    await AutoBackupService.instance.triggerAutoBackup();
     return deductions;
   }
 
@@ -363,6 +367,7 @@ class DatabaseService {
     }
 
     await _persist();
+    await AutoBackupService.instance.triggerAutoBackup();
   }
 
   Future<String> exportInventoryCsv() async {

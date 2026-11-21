@@ -15,6 +15,8 @@ import 'widgets/big_touch_button.dart';
 import 'widgets/camera_scanner_modal.dart';
 import 'widgets/medicine_catalog_picker.dart';
 import 'widgets/about_dialog.dart';
+import 'widgets/auto_backup_dialog.dart';
+import '../../core/services/auto_backup_service.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
 class DashboardView extends StatefulWidget {
@@ -44,6 +46,16 @@ class _DashboardViewState extends State<DashboardView> {
     BarcodeHardwareListener.instance.startListening();
     BarcodeHardwareListener.instance.addListener(_onGlobalBarcodeScanned);
     _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkAutoBackupPrompt();
+    });
+  }
+
+  Future<void> _checkAutoBackupPrompt() async {
+    await AutoBackupService.instance.init();
+    if (!AutoBackupService.instance.hasPromptedForBackup && mounted) {
+      await AutoBackupDialog.show(context, isFirstLaunch: true);
+    }
   }
 
   @override
@@ -281,6 +293,9 @@ class _DashboardViewState extends State<DashboardView> {
                 case 'about':
                   AboutDocPocketDialog.show(context);
                   break;
+                case 'auto_backup':
+                  AutoBackupDialog.show(context, isFirstLaunch: false).then((_) => _loadData());
+                  break;
                 case 'pdf_inventory':
                   PdfReportService.printInventoryReport(_medicines);
                   break;
@@ -312,6 +327,16 @@ class _DashboardViewState extends State<DashboardView> {
                     Icon(Icons.info_outline_rounded, color: AppColors.primaryBlue),
                     SizedBox(width: 10),
                     Text('À propos & Mises à jour (APK)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'auto_backup',
+                child: Row(
+                  children: [
+                    Icon(Icons.security_rounded, color: AppColors.alertValid),
+                    SizedBox(width: 10),
+                    Text('Sauvegardes automatiques (5 max)'),
                   ],
                 ),
               ),

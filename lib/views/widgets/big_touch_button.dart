@@ -27,8 +27,8 @@ class BigTouchButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isSecondary) {
-      return SizedBox(
-        height: height,
+      return ConstrainedBox(
+        constraints: BoxConstraints(minHeight: height),
         child: OutlinedButton(
           onPressed: onPressed,
           style: OutlinedButton.styleFrom(
@@ -88,8 +88,8 @@ class BigTouchButton extends StatelessWidget {
       );
     }
 
-    return SizedBox(
-      height: height,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: height),
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
