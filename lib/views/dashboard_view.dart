@@ -16,6 +16,8 @@ import 'widgets/camera_scanner_modal.dart';
 import 'widgets/medicine_catalog_picker.dart';
 import 'widgets/about_dialog.dart';
 import 'widgets/auto_backup_dialog.dart';
+import 'widgets/add_batch_dialog.dart';
+import 'widgets/add_boxes_dialog.dart';
 import '../../core/services/auto_backup_service.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
@@ -851,6 +853,75 @@ class _DashboardViewState extends State<DashboardView> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Rangée d'actions rapides : + Boîte identique et + Nouveau lot
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  InkWell(
+                    onTap: () async {
+                      final updated = await AddBoxesDialog.show(context, medicine: med);
+                      if (updated == true) _loadData();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.shade300, width: 0.9),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_circle_outline_rounded, size: 15, color: Colors.teal.shade800),
+                          const SizedBox(width: 4),
+                          Text(
+                            '+ Boîte identique',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () async {
+                      final updated = await AddBatchDialog.show(context, med);
+                      if (updated == true) _loadData();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.4), width: 0.9),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_rounded, size: 15, color: AppColors.primaryDark),
+                          SizedBox(width: 4),
+                          Text(
+                            '+ Nouveau lot',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryDark,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

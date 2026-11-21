@@ -144,6 +144,41 @@ class DatabaseService {
     return _medicines[cleanGtin];
   }
 
+  static String normalizeKey(String s) {
+    return s.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  /// Recherche un médicament existant par GTIN ou par identité pharmaceutique
+  /// (même nom commercial, même forme galénique, même conditionnement/dosage)
+  Medicine? findExistingMedicine({
+    required String commercialName,
+    required String form,
+    required String dosage,
+    String? cipGtin,
+  }) {
+    if (cipGtin != null && cipGtin.trim().isNotEmpty && !cipGtin.startsWith('CODE_')) {
+      final byGtin = _medicines[cipGtin.trim()];
+      if (byGtin != null) return byGtin;
+    }
+
+    final normName = normalizeKey(commercialName);
+    final normForm = normalizeKey(form);
+    final normDosage = normalizeKey(dosage);
+
+    if (normName.isEmpty) return null;
+
+    for (final med in _medicines.values) {
+      final mName = normalizeKey(med.commercialName);
+      final mForm = normalizeKey(med.form);
+      final mDosage = normalizeKey(med.dosage);
+
+      if (mName == normName && mForm == normForm && mDosage == normDosage) {
+        return med;
+      }
+    }
+    return null;
+  }
+
   // --------------------------------------------------------------------------
   // ÉCRITURE
   // --------------------------------------------------------------------------
@@ -183,29 +218,45 @@ class DatabaseService {
     await init();
     final now = DateTime.now();
 
-    // 1. Sauvegarder la fiche médicament
-    await saveMedicine(medicine);
+    // 1. Détecter si le médicament existe déjà (même nom, même forme, même conditionnement)
+    Medicine targetMedicine = medicine;
+    final existingMed = findExistingMedicine(
+      commercialName: medicine.commercialName,
+      form: medicine.form,
+      dosage: medicine.dosage,
+      cipGtin: medicine.cipGtin,
+    );
 
-    // 2. Traiter le lot
+    if (existingMed != null) {
+      targetMedicine = existingMed;
+    } else {
+      _medicines[targetMedicine.cipGtin] = targetMedicine;
+    }
+
+    // 2. Traiter le lot : lot existant ou nouveau lot
+    final cleanBatchNumber = batchNumber.trim().isEmpty ? 'SANS-LOT' : batchNumber.trim();
     MedicineBatch? targetBatch;
-    for (final b in medicine.batches) {
-      if (b.batchNumber.toLowerCase().trim() == batchNumber.toLowerCase().trim()) {
+    for (final b in targetMedicine.batches) {
+      if (b.batchNumber.toLowerCase().trim() == cleanBatchNumber.toLowerCase().trim()) {
         targetBatch = b;
         break;
       }
     }
 
     if (targetBatch != null) {
+      // Cas A : Lot identique -> on incrémente le nombre de boîtes
       final updated = targetBatch.copyWith(
         quantity: targetBatch.quantity + quantity,
         initialQuantity: targetBatch.initialQuantity + quantity,
+        expiryDate: expiryDate,
       );
       await saveBatch(updated);
     } else {
+      // Cas B : Nouveau lot rattaché au médicament existant
       final newBatch = MedicineBatch(
         id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
-        medicineId: medicine.id,
-        batchNumber: batchNumber,
+        medicineId: targetMedicine.id,
+        batchNumber: cleanBatchNumber,
         expiryDate: expiryDate,
         quantity: quantity,
         initialQuantity: quantity,
@@ -218,14 +269,45 @@ class DatabaseService {
     // 3. Mouvement de traçabilité
     final movement = StockMovement(
       id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
-      medicineId: medicine.id,
+      medicineId: targetMedicine.id,
       batchId: targetBatch?.id,
       type: MovementType.entry,
       quantity: quantity,
       movementDate: now,
+      medicineNameSnapshot: targetMedicine.commercialName,
+      batchNumberSnapshot: cleanBatchNumber,
+      note: note ?? (targetBatch != null ? 'Ajout boîtes identiques' : 'Réception nouveau lot'),
+    );
+    await recordMovement(movement);
+    await AutoBackupService.instance.triggerAutoBackup();
+  }
+
+  /// Ajoute manuellement des boîtes à un lot existant avec les mêmes caractéristiques
+  Future<void> addBoxesToBatch({
+    required Medicine medicine,
+    required MedicineBatch batch,
+    required int additionalQuantity,
+    String? note,
+  }) async {
+    await init();
+    final now = DateTime.now();
+
+    final updated = batch.copyWith(
+      quantity: batch.quantity + additionalQuantity,
+      initialQuantity: batch.initialQuantity + additionalQuantity,
+    );
+    await saveBatch(updated);
+
+    final movement = StockMovement(
+      id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
+      medicineId: medicine.id,
+      batchId: batch.id,
+      type: MovementType.entry,
+      quantity: additionalQuantity,
+      movementDate: now,
       medicineNameSnapshot: medicine.commercialName,
-      batchNumberSnapshot: batchNumber,
-      note: note ?? 'Réception délégué (${medicine.laboratory})',
+      batchNumberSnapshot: batch.batchNumber,
+      note: note ?? 'Ajout manuel (+$additionalQuantity boîte(s))',
     );
     await recordMovement(movement);
     await AutoBackupService.instance.triggerAutoBackup();

@@ -144,18 +144,26 @@ class _StockEntryViewState extends State<StockEntryView> {
         _packagingController.text = selected.packaging;
         _isAssigned = true;
 
-        _existingMedicine = Medicine(
-          id: 'med_${DateTime.now().millisecondsSinceEpoch}',
-          cipGtin: gtin,
+        final match = DatabaseService.instance.findExistingMedicine(
           commercialName: selected.cleanCommercialName,
-          dci: selected.dci,
-          dosage: selected.packaging,
           form: selected.form,
-          therapeuticClass: selected.therapeuticClass,
-          laboratory: selected.laboratory,
-          createdAt: now,
-          updatedAt: now,
+          dosage: selected.packaging,
+          cipGtin: gtin,
         );
+
+        _existingMedicine = match ??
+            Medicine(
+              id: 'med_${DateTime.now().millisecondsSinceEpoch}',
+              cipGtin: gtin,
+              commercialName: selected.cleanCommercialName,
+              dci: selected.dci,
+              dosage: selected.packaging,
+              form: selected.form,
+              therapeuticClass: selected.therapeuticClass,
+              laboratory: selected.laboratory,
+              createdAt: now,
+              updatedAt: now,
+            );
       });
 
       if (_expiryController.text.isEmpty) {

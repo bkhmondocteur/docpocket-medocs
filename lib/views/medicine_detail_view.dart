@@ -5,6 +5,8 @@ import '../../models/stock_alert_level.dart';
 import '../../models/stock_movement.dart';
 import '../../core/database/database_service.dart';
 import 'widgets/alert_badge.dart';
+import 'widgets/add_batch_dialog.dart';
+import 'widgets/add_boxes_dialog.dart';
 
 /// Fiche détaillée du médicament avec historique des lots et des mouvements
 class MedicineDetailView extends StatefulWidget {
@@ -128,14 +130,34 @@ class _MedicineDetailViewState extends State<MedicineDetailView> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Liste des Lots
-                  const Text(
-                    'Lots et Échéances de Péremption',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.slateDark,
-                    ),
+                  // Liste des Lots avec bouton d'ajout de lot
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Lots & Péremptions',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.slateDark,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () async {
+                          final res = await AddBatchDialog.show(context, _medicine);
+                          if (res == true) _loadHistory();
+                        },
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('+ Nouveau lot', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   if (_medicine.batches.isEmpty)
@@ -150,29 +172,83 @@ class _MedicineDetailViewState extends State<MedicineDetailView> {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: batch.alertLevel.backgroundColor,
-                            child: Icon(batch.alertLevel.icon, color: batch.alertLevel.color),
-                          ),
-                          title: Text(
-                            'Lot : ${batch.batchNumber}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            'Péremption : ${batch.expiryDateFormatted} '
-                            '(${batch.remainingDays > 0 ? "dans ${batch.remainingDays}j" : "PÉRIMÉ"})',
-                          ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Row(
                             children: [
-                              Text(
-                                '${batch.quantity} boîte(s)',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              CircleAvatar(
+                                backgroundColor: batch.alertLevel.backgroundColor,
+                                child: Icon(batch.alertLevel.icon, color: batch.alertLevel.color),
                               ),
-                              AlertBadge(level: batch.alertLevel, compact: true),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Lot : ${batch.batchNumber}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        AlertBadge(level: batch.alertLevel, compact: true),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'Péremption : ${batch.expiryDateFormatted} '
+                                      '(${batch.remainingDays > 0 ? "dans ${batch.remainingDays}j" : "PÉRIMÉ"})',
+                                      style: TextStyle(fontSize: 12, color: batch.alertLevel.color),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${batch.quantity} boîte(s)',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  InkWell(
+                                    onTap: () async {
+                                      final res = await AddBoxesDialog.show(
+                                        context,
+                                        medicine: _medicine,
+                                        targetBatch: batch,
+                                      );
+                                      if (res == true) _loadHistory();
+                                    },
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.teal.shade50,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.teal.shade300, width: 0.8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.add_circle_outline_rounded, size: 13, color: Colors.teal.shade800),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '+ Boîte',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.teal.shade900,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
