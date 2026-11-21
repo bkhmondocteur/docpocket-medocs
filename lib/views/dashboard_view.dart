@@ -231,63 +231,95 @@ class _DashboardViewState extends State<DashboardView> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
-        titleSpacing: 16,
+        elevation: 0.5,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
+        titleSpacing: 14,
         title: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/images/logo.png',
-                width: 38,
-                height: 38,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.medication_liquid_rounded,
-                  color: AppColors.primaryBlue,
-                  size: 32,
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.medication_liquid_rounded,
+                    color: AppColors.primaryBlue,
+                    size: 30,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'DocPocket Medocs',
-                  style: TextStyle(
-                    color: AppColors.slateDark,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'DocPocket Medocs',
+                    style: TextStyle(
+                      color: AppColors.slateDark,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16.5,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  'Gestion des échantillons médicaux',
-                  style: TextStyle(color: AppColors.slateMedium, fontSize: 11.5),
-                ),
-              ],
+                  Text(
+                    'Gestion des échantillons',
+                    style: TextStyle(
+                      color: AppColors.slateMedium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryBlue, size: 26),
-            tooltip: 'Scanner par caméra',
-            onPressed: () async {
-              final code = await CameraScannerModal.show(context);
-              if (code != null && mounted) {
-                _showQuickScanDialog(code);
-              }
-            },
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 9),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.3)),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryDark, size: 21),
+              tooltip: 'Scanner caméra',
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(7),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: () async {
+                final code = await CameraScannerModal.show(context);
+                if (code != null && mounted) {
+                  _showQuickScanDialog(code);
+                }
+              },
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.info_outline_rounded, color: AppColors.primaryBlue, size: 24),
-            tooltip: 'À propos & Mises à jour',
-            onPressed: () => AboutDocPocketDialog.show(context),
-          ),
+          const SizedBox(width: 2),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppColors.slateDark),
-            tooltip: 'Outils & Rapports',
+            tooltip: 'Menu & Outils',
             onSelected: (val) {
               switch (val) {
                 case 'about':
@@ -432,7 +464,7 @@ class _DashboardViewState extends State<DashboardView> {
                   Expanded(
                     child: BigTouchButton(
                       label: 'Entrée en stock',
-                      subtitle: 'Réception délégués',
+                      subtitle: 'Réception délégué',
                       icon: Icons.add_box_rounded,
                       color: AppColors.primaryBlue,
                       onPressed: () {
@@ -446,7 +478,7 @@ class _DashboardViewState extends State<DashboardView> {
                   Expanded(
                     child: BigTouchButton(
                       label: 'Sortie / Remise',
-                      subtitle: 'Priorité FEFO patient',
+                      subtitle: 'Délivrance FEFO',
                       icon: Icons.output_rounded,
                       color: AppColors.primaryDark,
                       onPressed: () {
@@ -509,22 +541,38 @@ class _DashboardViewState extends State<DashboardView> {
               ),
               const SizedBox(height: 14),
 
-              // Barre de recherche instantanée
+              // Barre de recherche instantanée avec bouton de scan intégré
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Rechercher par nom commercial, forme, lot...',
+                  hintText: 'Rechercher ou scanner (nom, DCI, lot)...',
                   prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryBlue),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          tooltip: 'Effacer la recherche',
                           onPressed: () {
                             _searchController.clear();
                             _loadData();
                           },
-                        )
-                      : null,
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryBlue, size: 20),
+                        tooltip: 'Scanner code-barres / QR',
+                        onPressed: () async {
+                          final code = await CameraScannerModal.show(context);
+                          if (code != null && mounted) {
+                            _showQuickScanDialog(code);
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -568,27 +616,44 @@ class _DashboardViewState extends State<DashboardView> {
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       children: [
-                        const Icon(Icons.inventory_2_outlined, size: 56, color: AppColors.slateMedium),
-                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.primaryBlue),
+                        ),
+                        const SizedBox(height: 16),
                         const Text(
-                          'Aucun échantillon ne correspond à vos critères.',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          'Aucun échantillon en stock',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.slateDark),
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Scannez une boîte avec votre douchette USB pour commencer.',
-                          style: TextStyle(color: AppColors.slateMedium),
+                          'Scannez un code-barres / Datamatrix ou enregistrez une réception de délégué.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.slateMedium, fontSize: 13),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         ElevatedButton.icon(
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const StockEntryView()),
                             ).then((_) => _loadData());
                           },
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Enregistrer une entrée'),
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue),
+                          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                          label: const Text(
+                            'Enregistrer une entrée',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 2,
+                          ),
                         ),
                       ],
                     ),

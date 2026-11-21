@@ -73,9 +73,9 @@ class BigTouchButton extends StatelessWidget {
                         style: TextStyle(
                           color: color.withValues(alpha: 0.85),
                           fontSize: 10.5,
-                          height: 1.1,
+                          height: 1.15,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -137,9 +137,9 @@ class BigTouchButton extends StatelessWidget {
                       style: TextStyle(
                         color: textColor.withValues(alpha: 0.9),
                         fontSize: 10.5,
-                        height: 1.1,
+                        height: 1.15,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
