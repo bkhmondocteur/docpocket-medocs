@@ -232,19 +232,43 @@ class _DashboardViewState extends State<DashboardView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'dashboard_fab_scanner',
+        onPressed: () async {
+          final code = await CameraScannerModal.show(context);
+          if (code != null && mounted) {
+            _showQuickScanDialog(code);
+          }
+        },
+        backgroundColor: AppColors.primaryBlue,
+        elevation: 3.5,
+        icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 21),
+        label: const Text(
+          'Scanner',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.3,
+            fontSize: 14,
+          ),
+        ),
+      ),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
         shadowColor: Colors.black.withValues(alpha: 0.08),
-        titleSpacing: 14,
-        title: Row(
-          children: [
-            Container(
+        leadingWidth: 54,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 14),
+          child: Center(
+            child: Container(
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 4,
                     offset: const Offset(0, 1),
                   ),
@@ -254,46 +278,45 @@ class _DashboardViewState extends State<DashboardView> {
                 borderRadius: BorderRadius.circular(10),
                 child: Image.asset(
                   'assets/images/logo.png',
-                  width: 36,
-                  height: 36,
+                  width: 38,
+                  height: 38,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.medication_liquid_rounded,
                     color: AppColors.primaryBlue,
-                    size: 30,
+                    size: 28,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'DocPocket Medocs',
-                    style: TextStyle(
-                      color: AppColors.slateDark,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16.5,
-                      letterSpacing: -0.2,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    'Gestion des échantillons',
-                    style: TextStyle(
-                      color: AppColors.slateMedium,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+          ),
+        ),
+        titleSpacing: 6,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'DocPocket Medocs',
+              style: TextStyle(
+                color: AppColors.slateDark,
+                fontWeight: FontWeight.w800,
+                fontSize: 16.5,
+                letterSpacing: -0.3,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: 1),
+            Text(
+              'Gestion des échantillons',
+              style: TextStyle(
+                color: AppColors.slateMedium,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -303,10 +326,10 @@ class _DashboardViewState extends State<DashboardView> {
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.3)),
+              border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.35)),
             ),
             child: IconButton(
-              icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryDark, size: 21),
+              icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryDark, size: 20),
               tooltip: 'Scanner caméra',
               visualDensity: VisualDensity.compact,
               padding: const EdgeInsets.all(7),
@@ -319,7 +342,7 @@ class _DashboardViewState extends State<DashboardView> {
               },
             ),
           ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 4),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppColors.slateDark),
             tooltip: 'Menu & Outils',
@@ -511,10 +534,11 @@ class _DashboardViewState extends State<DashboardView> {
               // Synthèse & Badges d'alertes cliquables
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
                 child: Row(
                   children: [
                     _filterChip(
-                      label: 'Tout le stock (${_stats["totalBoxes"]} boîtes)',
+                      label: 'Tout (${_stats["totalBoxes"]} btes)',
                       isSelected: _selectedFilter == null,
                       color: AppColors.primaryBlue,
                       onTap: () {
@@ -562,38 +586,57 @@ class _DashboardViewState extends State<DashboardView> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Rechercher ou scanner (nom, DCI, lot)...',
+                  hintStyle: const TextStyle(color: AppColors.slateMedium, fontSize: 13.5),
                   prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryBlue),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_searchController.text.isNotEmpty)
                         IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          icon: const Icon(Icons.clear_rounded, size: 18, color: AppColors.slateMedium),
                           tooltip: 'Effacer la recherche',
                           onPressed: () {
                             _searchController.clear();
                             _loadData();
                           },
                         ),
-                      IconButton(
-                        icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryBlue, size: 20),
-                        tooltip: 'Scanner code-barres / QR',
-                        onPressed: () async {
-                          final code = await CameraScannerModal.show(context);
-                          if (code != null && mounted) {
-                            _showQuickScanDialog(code);
-                          }
-                        },
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.3)),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryDark, size: 19),
+                          tooltip: 'Scanner code-barres / QR',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                          onPressed: () async {
+                            final code = await CameraScannerModal.show(context);
+                            if (code != null && mounted) {
+                              _showQuickScanDialog(code);
+                            }
+                          },
+                        ),
                       ),
-                      const SizedBox(width: 4),
                     ],
                   ),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
                   ),
                 ),
                 onChanged: (_) => _loadData(),
@@ -629,7 +672,7 @@ class _DashboardViewState extends State<DashboardView> {
                   color: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: Padding(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(28),
                     child: Column(
                       children: [
                         Container(
@@ -638,39 +681,92 @@ class _DashboardViewState extends State<DashboardView> {
                             color: Colors.blue.shade50,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.primaryBlue),
+                          child: Icon(
+                            _searchController.text.isNotEmpty || _selectedFilter != null
+                                ? Icons.search_off_rounded
+                                : Icons.inventory_2_outlined,
+                            size: 46,
+                            color: AppColors.primaryBlue,
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Aucun échantillon en stock',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.slateDark),
+                        Text(
+                          _searchController.text.isNotEmpty || _selectedFilter != null
+                              ? 'Aucun résultat correspondant'
+                              : 'Aucun échantillon en stock',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, color: AppColors.slateDark),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          'Scannez un code-barres / Datamatrix ou enregistrez une réception de délégué.',
+                        Text(
+                          _searchController.text.isNotEmpty || _selectedFilter != null
+                              ? 'Aucun médicament ne correspond à vos filtres actuels. Modifiez votre recherche ou réinitialisez.'
+                              : 'Scannez une boîte avec votre douchette USB ou caméra, ou enregistrez une réception de délégué.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.slateMedium, fontSize: 13),
+                          style: const TextStyle(color: AppColors.slateMedium, fontSize: 13),
                         ),
                         const SizedBox(height: 20),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const StockEntryView()),
-                            ).then((_) => _loadData());
-                          },
-                          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                          label: const Text(
-                            'Enregistrer une entrée',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        if (_searchController.text.isNotEmpty || _selectedFilter != null)
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _selectedFilter = null);
+                              _loadData();
+                            },
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Réinitialiser les filtres'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primaryBlue,
+                              side: const BorderSide(color: AppColors.primaryBlue),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          )
+                        else
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 10,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const StockEntryView()),
+                                  ).then((_) => _loadData());
+                                },
+                                icon: const Icon(Icons.add_rounded, color: Colors.white, size: 19),
+                                label: const Text(
+                                  'Enregistrer une entrée',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryBlue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  elevation: 2,
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final code = await CameraScannerModal.show(context);
+                                  if (code != null && mounted) {
+                                    _showQuickScanDialog(code);
+                                  }
+                                },
+                                icon: const Icon(Icons.qr_code_scanner_rounded, size: 19),
+                                label: const Text(
+                                  'Scanner un code',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryBlue,
+                                  side: const BorderSide(color: AppColors.primaryBlue, width: 1.2),
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryBlue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 2,
-                          ),
-                        ),
                       ],
                     ),
                   ),
