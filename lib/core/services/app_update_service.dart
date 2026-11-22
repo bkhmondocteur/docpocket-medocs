@@ -34,8 +34,8 @@ class AppUpdateService {
   static final AppUpdateService instance = AppUpdateService._internal();
   AppUpdateService._internal();
 
-  static const String currentVersion = '1.0.8';
-  static const int currentBuildNumber = 9;
+  static const String currentVersion = '1.0.9';
+  static const int currentBuildNumber = 10;
 
   static const String githubOwner = 'bkhmondocteur';
   static const String githubRepo = 'docpocket-medocs';

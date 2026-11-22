@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocPocket Medocs - Générateur de Clés de Licence (Keygen Éditeur)</title>
+    <style>
+        :root {
+            --primary: #1976D2;
+            --primary-dark: #0D47A1;
+            --primary-light: #E3F2FD;
+            --text-dark: #1E293B;
+            --text-muted: #64748B;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --success: #16A34A;
+            --border: #E2E8F0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-dark);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border);
+            max-width: 580px;
+            width: 100%;
+            padding: 36px 32px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .badge-admin {
+            display: inline-block;
+            background: #FEF3C7;
+            color: #92400E;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+            border: 1px solid #FDE68A;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            font-size: 13.5px;
+            color: var(--text-muted);
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s ease;
+            background: #FAFAFA;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            background: #FFF;
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
+        }
+
+        .row-2 {
+            display: flex;
+            gap: 14px;
+        }
+
+        .row-2 .form-group {
+            flex: 1;
+        }
+
+        button.btn-generate {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            margin-top: 6px;
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.25);
+        }
+
+        button.btn-generate:hover {
+            box-shadow: 0 6px 16px rgba(25, 118, 210, 0.35);
+            transform: translateY(-1px);
+        }
+
+        button.btn-generate:active {
+            transform: translateY(0);
+        }
+
+        .result-box {
+            display: none;
+            margin-top: 28px;
+            padding: 20px;
+            border-radius: 14px;
+            background: #F0FDF4;
+            border: 1.5px solid #BBF7D0;
+        }
+
+        .result-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .license-display {
+            background: #FFF;
+            border: 1.5px solid #86EFAC;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary-dark);
+            letter-spacing: 1.5px;
+            text-align: center;
+            user-select: all;
+            margin-bottom: 12px;
+        }
+
+        .cabinet-info {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-copy-key {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            border-color: #BFDBFE;
+        }
+
+        .btn-copy-key:hover {
+            background: #DBEAFE;
+        }
+
+        .btn-copy-msg {
+            background: #DCFCE7;
+            color: #166534;
+            border-color: #BBF7D0;
+        }
+
+        .btn-copy-msg:hover {
+            background: #BBF7D0;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1E293B;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 500;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <span class="badge-admin">🔒 Outil Réservé à l'Éditeur</span>
+        <h1>Keygen DocPocket Medocs</h1>
+        <p>Générateur cryptographique officiel de clés d'activation médicales</p>
+    </div>
+
+    <form id="keygenForm" onsubmit="generateLicense(event)">
+        <div class="row-2">
+            <div class="form-group">
+                <label for="nom">Nom du Médecin *</label>
+                <input type="text" id="nom" placeholder="Ex: BEN KHALIFA" required autocomplete="off" style="text-transform: uppercase;">
+            </div>
+            <div class="form-group">
+                <label for="prenom">Prénom du Médecin *</label>
+                <input type="text" id="prenom" placeholder="Ex: Mohamed" required autocomplete="off">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="orderNumber">Numéro d'Ordre des Médecins *</label>
+            <input type="text" id="orderNumber" placeholder="Ex: 12345" required autocomplete="off">
+        </div>
+
+        <button type="submit" class="btn-generate">🔑 Générer la Clé de Licence</button>
+    </form>
+
+    <div id="resultBox" class="result-box">
+        <div class="result-title">
+            ✓ Licence Médicale Officielle Générée
+        </div>
+        <div id="licenseKeyOutput" class="license-display">
+            DOC-XXXX-YYYY-ZZZZ-WWWW
+        </div>
+        <div id="cabinetIdOutput" class="cabinet-info">
+            Cabinet ID : CAB-00000-XXXXXX
+        </div>
+        <div class="action-buttons">
+            <button class="action-btn btn-copy-key" onclick="copyKeyOnly()">
+                📋 Copier la clé
+            </button>
+            <button class="action-btn btn-copy-msg" onclick="copyFullMessage()">
+                💬 Copier message WhatsApp/SMS
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast">Texte copié dans le presse-papiers !</div>
+
+<script>
+    const SALT = "DOCPOCKET_MEDOCS_TUNISIE_2026_SECURE_SALT";
+
+    async function sha256Hex(message) {
+        const msgBuffer = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    }
+
+    function normalizeText(text) {
+        return text.trim().toUpperCase().replace(/\s+/g, ' ');
+    }
+
+    let currentNom = "";
+    let currentPrenom = "";
+    let currentOrder = "";
+    let currentKey = "";
+    let currentCabId = "";
+
+    async function generateLicense(e) {
+        e.preventDefault();
+
+        const nom = document.getElementById("nom").value;
+        const prenom = document.getElementById("prenom").value;
+        const order = document.getElementById("orderNumber").value;
+
+        const cleanNom = normalizeText(nom);
+        const cleanPrenom = normalizeText(prenom);
+        const cleanOrder = order.trim();
+
+        // Formule cryptographique officielle DocPocket
+        const rawKey = `${cleanNom}|${cleanPrenom}|${cleanOrder}|${SALT}`;
+        const keyHash = await sha256Hex(rawKey);
+
+        const b1 = keyHash.substring(0, 4);
+        const b2 = keyHash.substring(4, 8);
+        const b3 = keyHash.substring(8, 12);
+        const b4 = keyHash.substring(12, 16);
+
+        currentKey = `DOC-${b1}-${b2}-${b3}-${b4}`;
+
+        const rawCab = `${cleanOrder}|${cleanNom}|${SALT}`;
+        const cabHash = await sha256Hex(rawCab);
+        currentCabId = `CAB-${cleanOrder.padStart(5, '0')}-${cabHash.substring(0, 6)}`;
+
+        currentNom = cleanNom;
+        currentPrenom = prenom.trim();
+        currentOrder = cleanOrder;
+
+        document.getElementById("licenseKeyOutput").innerText = currentKey;
+        document.getElementById("cabinetIdOutput").innerText = `Cabinet ID : ${currentCabId} • Dr. ${currentNom} ${currentPrenom}`;
+        document.getElementById("resultBox").style.display = "block";
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.innerText = msg;
+        t.style.display = "block";
+        setTimeout(() => { t.style.display = "none"; }, 2500);
+    }
+
+    function copyKeyOnly() {
+        navigator.clipboard.writeText(currentKey);
+        showToast("Clé de licence copiée : " + currentKey);
+    }
+
+    function copyFullMessage() {
+        const msg = `Cher Dr. ${currentNom} ${currentPrenom},\n\nVoici votre clé d'activation officielle pour DocPocket Medocs :\n\n🔑 Clé de Licence : ${currentKey}\n📋 N° d'Ordre : ${currentOrder}\n\nÀ l'ouverture de votre application (APK Android ou Web PWA), sélectionnez « Je suis Médecin », saisissez votre Nom, Prénom, Numéro d'Ordre et collez cette clé de licence pour activer et synchroniser votre cabinet.`;
+        navigator.clipboard.writeText(msg);
+        showToast("Message complet copié pour WhatsApp/SMS !");
+    }
+</script>
+
+</body>
+</html>

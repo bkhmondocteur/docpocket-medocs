@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'core/constants/app_colors.dart';
 import 'core/database/database_service.dart';
+import 'core/services/license_service.dart';
+import 'core/services/supabase_sync_service.dart';
 import 'views/dashboard_view.dart';
+import 'views/welcome_auth_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     await DatabaseService.instance.init();
+    await LicenseService.instance.init();
+    await SupabaseSyncService.instance.init();
+
+    // Synchronisation initiale silencieuse si le cabinet est activé
+    if (LicenseService.instance.isAuthenticated) {
+      SupabaseSyncService.instance.syncStock(actionDescription: 'Démarrage application');
+    }
   } catch (e) {
-    debugPrint('Init storage warning: $e');
+    debugPrint('Init services warning: $e');
   }
 
   runApp(const DocPocketMedocsApp());
@@ -56,13 +66,15 @@ class DocPocketMedocsApp extends StatelessWidget {
             borderSide: const BorderSide(color: AppColors.slateLight),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
           ),
           labelStyle: const TextStyle(color: AppColors.slateMedium),
         ),
       ),
-      home: const DashboardView(),
+      home: LicenseService.instance.isAuthenticated
+          ? const DashboardView()
+          : const WelcomeAuthView(),
     );
   }
 }

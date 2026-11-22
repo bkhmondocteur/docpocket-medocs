@@ -9,6 +9,8 @@ import '../../models/medicine_batch.dart';
 import '../../models/stock_movement.dart';
 import '../../models/stock_alert_level.dart';
 import '../services/auto_backup_service.dart';
+import '../services/license_service.dart';
+import '../services/supabase_sync_service.dart';
 
 /// Service de stockage local 100% rapide, autonome, universel et persistant
 /// Les données de stock sont protégées contre toute suppression lors des mises à jour
@@ -181,6 +183,11 @@ class DatabaseService {
       } catch (e) {
         debugPrint('[DatabaseService] Erreur écriture miroir disque : $e');
       }
+    }
+
+    // Synchronisation en arrière-plan avec Supabase Cloud si activée
+    if (SupabaseSyncService.instance.isAutoSyncEnabled && LicenseService.instance.isAuthenticated) {
+      SupabaseSyncService.instance.syncStock();
     }
   }
 

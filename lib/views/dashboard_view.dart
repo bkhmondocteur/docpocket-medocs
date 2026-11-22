@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/database/database_service.dart';
@@ -20,9 +22,14 @@ import 'widgets/add_batch_dialog.dart';
 import 'widgets/add_boxes_dialog.dart';
 import 'widgets/create_custom_medicine_dialog.dart';
 import 'widgets/expiry_notifications_dialog.dart';
+import 'widgets/secretary_management_dialog.dart';
+import 'widgets/cloud_sync_dialog.dart';
+import 'welcome_auth_view.dart';
 import '../../core/services/auto_backup_service.dart';
 import '../../core/services/expiry_notification_service.dart';
 import '../../core/services/medicines_catalog_service.dart';
+import '../../core/services/license_service.dart';
+import '../../core/services/supabase_sync_service.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
 class DashboardView extends StatefulWidget {
@@ -49,12 +56,16 @@ class _DashboardViewState extends State<DashboardView> {
 
   StockAlertLevel? _selectedFilter;
   bool _isLoading = true;
+  StreamSubscription<SyncStatus>? _syncSub;
 
   @override
   void initState() {
     super.initState();
     BarcodeHardwareListener.instance.startListening();
     BarcodeHardwareListener.instance.addListener(_onGlobalBarcodeScanned);
+    _syncSub = SupabaseSyncService.instance.onSyncStatusChanged.listen((_) {
+      if (mounted) setState(() {});
+    });
     _loadData();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkAutoBackupPrompt();
@@ -70,6 +81,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   @override
   void dispose() {
+    _syncSub?.cancel();
     BarcodeHardwareListener.instance.removeListener(_onGlobalBarcodeScanned);
     BarcodeHardwareListener.instance.stopListening();
     _searchController.dispose();
@@ -249,6 +261,100 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 
+  void _showDoctorLicenseDialog() {
+    final doc = LicenseService.instance.doctorProfile;
+    if (doc == null) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.vpn_key_rounded, color: AppColors.primaryBlue),
+            SizedBox(width: 10),
+            Text('Ma Clé de Licence'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Médecin : ${doc.fullName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text('Numéro d\'Ordre : ${doc.orderNumber}', style: const TextStyle(color: AppColors.slateMedium, fontSize: 13)),
+            Text('Cabinet ID : ${doc.cabinetId}', style: const TextStyle(color: AppColors.slateMedium, fontSize: 13)),
+            const SizedBox(height: 12),
+            const Text('Clé de Licence officielle :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      doc.licenseKey,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy_rounded, color: AppColors.primaryBlue, size: 20),
+                    tooltip: 'Copier la clé',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: doc.licenseKey));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Clé de licence copiée dans le presse-papiers !')),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Fermer')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Souhaitez-vous fermer la session active ? Vos stocks restent conservés et synchronisés.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Déconnexion'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      await LicenseService.instance.logout();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const WelcomeAuthView()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -292,11 +398,11 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ),
         titleSpacing: 6,
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
+            const Text(
               'DocPocket Medocs',
               style: TextStyle(
                 color: AppColors.slateDark,
@@ -307,13 +413,15 @@ class _DashboardViewState extends State<DashboardView> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: 1),
+            const SizedBox(height: 1),
             Text(
-              'Gestion des échantillons',
-              style: TextStyle(
-                color: AppColors.slateMedium,
+              LicenseService.instance.isDoctor
+                  ? '${LicenseService.instance.userDisplayName} • Stock'
+                  : '${LicenseService.instance.userDisplayName} • Stock',
+              style: const TextStyle(
+                color: AppColors.primaryBlue,
                 fontSize: 11,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -321,6 +429,21 @@ class _DashboardViewState extends State<DashboardView> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              Icons.cloud_sync_rounded,
+              color: SupabaseSyncService.instance.status == SyncStatus.synced
+                  ? AppColors.alertValid
+                  : (SupabaseSyncService.instance.status == SyncStatus.syncing
+                      ? Colors.orange.shade700
+                      : AppColors.slateDark),
+              size: 22,
+            ),
+            tooltip: 'Supabase Cloud : ${SupabaseSyncService.instance.lastSyncMessage}',
+            onPressed: () {
+              CloudSyncDialog.show(context).then((_) => _loadData());
+            },
+          ),
           IconButton(
             icon: Badge(
               isLabelVisible: _expirySummary.hasAlerts,
@@ -364,6 +487,18 @@ class _DashboardViewState extends State<DashboardView> {
             tooltip: 'Menu & Outils',
             onSelected: (val) {
               switch (val) {
+                case 'secretary':
+                  SecretaryManagementDialog.show(context);
+                  break;
+                case 'cloud_sync':
+                  CloudSyncDialog.show(context).then((_) => _loadData());
+                  break;
+                case 'license_key':
+                  _showDoctorLicenseDialog();
+                  break;
+                case 'logout':
+                  _handleLogout();
+                  break;
                 case 'expiry_alerts':
                   ExpiryNotificationsDialog.show(
                     context,
@@ -404,6 +539,39 @@ class _DashboardViewState extends State<DashboardView> {
               }
             },
             itemBuilder: (ctx) => [
+              if (LicenseService.instance.isDoctor)
+                const PopupMenuItem(
+                  value: 'secretary',
+                  child: Row(
+                    children: [
+                      Icon(Icons.badge_rounded, color: AppColors.primaryBlue),
+                      SizedBox(width: 10),
+                      Text('Gestion Accès Secrétaire'),
+                    ],
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'cloud_sync',
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_sync_rounded, color: AppColors.primaryBlue),
+                    SizedBox(width: 10),
+                    Text('Synchronisation Supabase Cloud'),
+                  ],
+                ),
+              ),
+              if (LicenseService.instance.isDoctor)
+                const PopupMenuItem(
+                  value: 'license_key',
+                  child: Row(
+                    children: [
+                      Icon(Icons.vpn_key_rounded, color: AppColors.primaryDark),
+                      SizedBox(width: 10),
+                      Text('Ma Clé de Licence'),
+                    ],
+                  ),
+                ),
+              const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'expiry_alerts',
                 child: Row(
@@ -517,6 +685,17 @@ class _DashboardViewState extends State<DashboardView> {
                     Icon(Icons.delete_sweep_rounded, color: AppColors.alertExpired),
                     SizedBox(width: 10),
                     Text('Vider le stock (remise à zéro)', style: TextStyle(color: AppColors.alertExpired)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout_rounded, color: Colors.red),
+                    SizedBox(width: 10),
+                    Text('Déconnexion / Changer de rôle', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),
