@@ -1,4 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/medicine.dart';
 import '../../models/medicine_batch.dart';
@@ -6,16 +10,15 @@ import '../../models/stock_movement.dart';
 import '../../models/stock_alert_level.dart';
 import '../services/auto_backup_service.dart';
 
-/// Service de stockage local 100% rapide, autonome et universel
-/// Compatible Web (PWA / localStorage), Windows, macOS et Mobile
+/// Service de stockage local 100% rapide, autonome, universel et persistant
+/// Les données de stock sont protégées contre toute suppression lors des mises à jour
+/// grâce à une triple redondance (SharedPreferences, miroir disque et backups rotatifs).
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
   DatabaseService._internal();
 
-  // Version 3 garantie 100% propre sans stock fictif pour cabinet médical
   static const String _prefKeyMedicines = 'docpocket_medocs_medicines_v3';
   static const String _prefKeyMovements = 'docpocket_medocs_movements_v3';
-  static const String _prefKeyPurgeFlag = 'docpocket_has_purged_initial_stock_v3';
 
   final Map<String, Medicine> _medicines = {};
   final List<StockMovement> _movements = [];
@@ -26,32 +29,92 @@ class DatabaseService {
 
     final prefs = await SharedPreferences.getInstance();
 
-    // Nettoyer définitivement toutes les anciennes clés de test / stocks fictifs
-    final hasPurged = prefs.getBool(_prefKeyPurgeFlag) ?? false;
-    if (!hasPurged) {
-      const oldKeys = [
-        'docpocket_medicines',
-        'docpocket_movements',
-        'docpocket_medicines_v1',
-        'docpocket_movements_v1',
-        'docpocket_medocs_medicines',
-        'docpocket_medocs_movements',
-        'docpocket_medocs_medicines_v1',
-        'docpocket_medocs_movements_v1',
+    // 1. Lire la clé principale actuelle
+    var savedMeds = prefs.getString(_prefKeyMedicines);
+    var savedMoves = prefs.getString(_prefKeyMovements);
+
+    // 2. Si vide dans SharedPreferences, chercher dans les clés de versions antérieures (migration douce)
+    if (savedMeds == null || savedMeds.isEmpty || savedMeds == '[]') {
+      const legacyMedKeys = [
         'docpocket_medocs_medicines_v2',
-        'docpocket_medocs_movements_v2',
+        'docpocket_medocs_medicines_v1',
+        'docpocket_medocs_medicines',
+        'docpocket_medicines_v1',
+        'docpocket_medicines',
       ];
-      for (final k in oldKeys) {
-        await prefs.remove(k);
+      for (final key in legacyMedKeys) {
+        final legacyData = prefs.getString(key);
+        if (legacyData != null && legacyData.isNotEmpty && legacyData != '[]') {
+          savedMeds = legacyData;
+          debugPrint('[DatabaseService] Récupération et migration du stock depuis l\'ancienne clé : $key');
+          break;
+        }
       }
-      await prefs.remove(_prefKeyMedicines);
-      await prefs.remove(_prefKeyMovements);
-      await prefs.setBool(_prefKeyPurgeFlag, true);
     }
 
-    final savedMeds = prefs.getString(_prefKeyMedicines);
-    final savedMoves = prefs.getString(_prefKeyMovements);
+    if (savedMoves == null || savedMoves.isEmpty || savedMoves == '[]') {
+      const legacyMoveKeys = [
+        'docpocket_medocs_movements_v2',
+        'docpocket_medocs_movements_v1',
+        'docpocket_medocs_movements',
+        'docpocket_movements_v1',
+        'docpocket_movements',
+      ];
+      for (final key in legacyMoveKeys) {
+        final legacyData = prefs.getString(key);
+        if (legacyData != null && legacyData.isNotEmpty && legacyData != '[]') {
+          savedMoves = legacyData;
+          break;
+        }
+      }
+    }
 
+    // 3. Si toujours vide sur plateforme mobile/desktop, chercher dans le miroir de persistance disque
+    if ((savedMeds == null || savedMeds.isEmpty || savedMeds == '[]') && !kIsWeb) {
+      try {
+        final docDir = await getApplicationDocumentsDirectory();
+        final mirrorFile = File(p.join(docDir.path, 'docpocket_database_mirror.json'));
+        if (await mirrorFile.exists()) {
+          final content = await mirrorFile.readAsString();
+          if (content.isNotEmpty) {
+            final mirrorData = json.decode(content) as Map<String, dynamic>;
+            final mirrorMeds = mirrorData['medicines'];
+            final mirrorMoves = mirrorData['movements'];
+            if (mirrorMeds != null) savedMeds = json.encode(mirrorMeds);
+            if (mirrorMoves != null) savedMoves = json.encode(mirrorMoves);
+            debugPrint('[DatabaseService] Récupération automatique du stock depuis le miroir disque.');
+          }
+        }
+      } catch (e) {
+        debugPrint('[DatabaseService] Erreur lecture miroir disque : $e');
+      }
+    }
+
+    // 4. Si toujours vide, chercher dans les sauvegardes automatiques rotatives
+    if ((savedMeds == null || savedMeds.isEmpty || savedMeds == '[]') && !kIsWeb) {
+      try {
+        final docDir = await getApplicationDocumentsDirectory();
+        final backupDir = Directory(p.join(docDir.path, 'DocPocket_Backups'));
+        if (await backupDir.exists()) {
+          final files = backupDir.listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList();
+          if (files.isNotEmpty) {
+            files.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+            final latestFile = files.first;
+            final content = await latestFile.readAsString();
+            final jsonBackup = json.decode(content) as Map<String, dynamic>;
+            final backupMeds = jsonBackup['medicines'];
+            final backupMoves = jsonBackup['movements'];
+            if (backupMeds != null) savedMeds = json.encode(backupMeds);
+            if (backupMoves != null) savedMoves = json.encode(backupMoves);
+            debugPrint('[DatabaseService] Récupération de secours depuis le fichier backup : ${latestFile.path}');
+          }
+        }
+      } catch (e) {
+        debugPrint('[DatabaseService] Erreur restauration depuis backup : $e');
+      }
+    }
+
+    // 5. Désérialisation des médicaments
     _medicines.clear();
     if (savedMeds != null && savedMeds.isNotEmpty) {
       try {
@@ -63,11 +126,12 @@ class DatabaseService {
           final med = Medicine.fromMap(map, batches);
           _medicines[med.cipGtin] = med;
         }
-      } catch (_) {
-        _medicines.clear();
+      } catch (e) {
+        debugPrint('[DatabaseService] Erreur parsing médicaments : $e');
       }
     }
 
+    // 6. Désérialisation des mouvements
     _movements.clear();
     if (savedMoves != null && savedMoves.isNotEmpty) {
       try {
@@ -75,9 +139,14 @@ class DatabaseService {
         for (final item in list) {
           _movements.add(StockMovement.fromMap(item as Map<String, dynamic>));
         }
-      } catch (_) {
-        _movements.clear();
+      } catch (e) {
+        debugPrint('[DatabaseService] Erreur parsing mouvements : $e');
       }
+    }
+
+    // Si des données ont été restaurées, synchroniser immédiatement les deux couches de persistance
+    if (_medicines.isNotEmpty) {
+      await _persist();
     }
 
     _initialized = true;
@@ -96,6 +165,23 @@ class DatabaseService {
 
     final movesJson = _movements.map((mov) => mov.toMap()).toList();
     await prefs.setString(_prefKeyMovements, json.encode(movesJson));
+
+    // Couche de redondance : miroir persistant sur disque
+    if (!kIsWeb) {
+      try {
+        final docDir = await getApplicationDocumentsDirectory();
+        final mirrorFile = File(p.join(docDir.path, 'docpocket_database_mirror.json'));
+        final data = {
+          'version': 3,
+          'savedAt': DateTime.now().toIso8601String(),
+          'medicines': medsJson,
+          'movements': movesJson,
+        };
+        await mirrorFile.writeAsString(json.encode(data), flush: true);
+      } catch (e) {
+        debugPrint('[DatabaseService] Erreur écriture miroir disque : $e');
+      }
+    }
   }
 
   /// Réinitialise l'ensemble des stocks et mouvements pour repartir à zéro
@@ -103,6 +189,15 @@ class DatabaseService {
     _medicines.clear();
     _movements.clear();
     await _persist();
+    if (!kIsWeb) {
+      try {
+        final docDir = await getApplicationDocumentsDirectory();
+        final mirrorFile = File(p.join(docDir.path, 'docpocket_database_mirror.json'));
+        if (await mirrorFile.exists()) {
+          await mirrorFile.delete();
+        }
+      } catch (_) {}
+    }
     await AutoBackupService.instance.triggerAutoBackup();
   }
 

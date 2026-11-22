@@ -19,7 +19,9 @@ import 'widgets/auto_backup_dialog.dart';
 import 'widgets/add_batch_dialog.dart';
 import 'widgets/add_boxes_dialog.dart';
 import 'widgets/create_custom_medicine_dialog.dart';
+import 'widgets/expiry_notifications_dialog.dart';
 import '../../core/services/auto_backup_service.dart';
+import '../../core/services/expiry_notification_service.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
 class DashboardView extends StatefulWidget {
@@ -32,6 +34,10 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   final _searchController = TextEditingController();
   List<Medicine> _medicines = [];
+  List<Medicine> _allMedicines = [];
+  ExpirySummary _expirySummary = const ExpirySummary(expired: [], within1Month: [], within3Months: []);
+  bool _hasCheckedAutoNotification = false;
+
   Map<String, int> _stats = {
     'totalMedicines': 0,
     'totalBoxes': 0,
@@ -71,6 +77,9 @@ class _DashboardViewState extends State<DashboardView> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
+    final allMeds = await DatabaseService.instance.getAllMedicines();
+    final summary = ExpiryNotificationService.instance.computeSummary(allMeds);
+
     final meds = await DatabaseService.instance.getAllMedicines(
       searchQuery: _searchController.text,
       alertFilter: _selectedFilter,
@@ -79,10 +88,21 @@ class _DashboardViewState extends State<DashboardView> {
 
     if (mounted) {
       setState(() {
+        _allMedicines = allMeds;
+        _expirySummary = summary;
         _medicines = meds;
         _stats = stats;
         _isLoading = false;
       });
+
+      // Vérification et notification automatique à l'ouverture
+      if (!_hasCheckedAutoNotification) {
+        _hasCheckedAutoNotification = true;
+        final autoNotify = await ExpiryNotificationService.instance.isAutoNotifyEnabled();
+        if (autoNotify && summary.hasAlerts) {
+          await ExpiryNotificationService.instance.sendSystemNotification(allMeds);
+        }
+      }
     }
   }
 
@@ -321,6 +341,22 @@ class _DashboardViewState extends State<DashboardView> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Badge(
+              isLabelVisible: _expirySummary.hasAlerts,
+              label: Text('${_expirySummary.totalCount}'),
+              backgroundColor: _expirySummary.expired.isNotEmpty ? AppColors.alertExpired : Colors.orange.shade800,
+              child: const Icon(Icons.notifications_outlined, color: AppColors.slateDark, size: 22),
+            ),
+            tooltip: 'Alertes péremptions (${_expirySummary.totalCount})',
+            onPressed: () {
+              ExpiryNotificationsDialog.show(
+                context,
+                medicines: _allMedicines,
+                onDataChanged: _loadData,
+              );
+            },
+          ),
           Container(
             margin: const EdgeInsets.symmetric(vertical: 9),
             decoration: BoxDecoration(
@@ -348,6 +384,13 @@ class _DashboardViewState extends State<DashboardView> {
             tooltip: 'Menu & Outils',
             onSelected: (val) {
               switch (val) {
+                case 'expiry_alerts':
+                  ExpiryNotificationsDialog.show(
+                    context,
+                    medicines: _allMedicines,
+                    onDataChanged: _loadData,
+                  );
+                  break;
                 case 'about':
                   AboutDocPocketDialog.show(context);
                   break;
@@ -381,6 +424,19 @@ class _DashboardViewState extends State<DashboardView> {
               }
             },
             itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'expiry_alerts',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_active_rounded,
+                      color: _expirySummary.hasAlerts ? Colors.orange.shade800 : AppColors.primaryBlue,
+                    ),
+                    const SizedBox(width: 10),
+                    Text('Alertes Péremptions (${_expirySummary.totalCount})'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'about',
                 child: Row(
@@ -529,7 +585,84 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Bannière interactive d'alertes péremptions (stock > 0)
+              if (_expirySummary.hasAlerts) ...[
+                InkWell(
+                  onTap: () {
+                    ExpiryNotificationsDialog.show(
+                      context,
+                      medicines: _allMedicines,
+                      onDataChanged: _loadData,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: _expirySummary.expired.isNotEmpty ? Colors.red.shade50 : Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _expirySummary.expired.isNotEmpty ? Colors.red.shade200 : Colors.orange.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _expirySummary.expired.isNotEmpty ? Icons.warning_rounded : Icons.notifications_active_rounded,
+                          color: _expirySummary.expired.isNotEmpty ? AppColors.alertExpired : Colors.orange.shade800,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_expirySummary.totalCount} alerte${_expirySummary.totalCount > 1 ? "s" : ""} de péremption (${_expirySummary.totalBoxesAlerted} boîte${_expirySummary.totalBoxesAlerted > 1 ? "s" : ""})',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: _expirySummary.expired.isNotEmpty ? AppColors.alertExpired : Colors.orange.shade900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_expirySummary.expired.length} périmé(s) • ${_expirySummary.within1Month.length} < 1 mois • ${_expirySummary.within3Months.length} < 3 mois',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _expirySummary.expired.isNotEmpty ? Colors.red.shade200 : Colors.orange.shade200,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('Gérer', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
+                              SizedBox(width: 2),
+                              Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppColors.primaryBlue),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Synthèse & Badges d'alertes cliquables
               SingleChildScrollView(
