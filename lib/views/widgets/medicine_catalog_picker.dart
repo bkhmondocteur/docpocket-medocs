@@ -134,21 +134,75 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                   ),
                   onPressed: () async {
                     final nav = Navigator.of(context);
-                    final query = _searchController.text;
+                    final query = _searchController.text.trim();
                     final created = await CreateCustomMedicineDialog.show(
                       context,
-                      initialName: query,
+                      initialName: query.isNotEmpty ? query : null,
                     );
                     if (created != null) {
                       nav.pop(created);
                     }
                   },
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text('+ Non répertorié', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                  label: const Text('+ Ajouter un médicament', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
             const SizedBox(height: 6),
+
+            // Bouton dynamique pour ajouter directement le nom saisi s'il n'est pas répertorié
+            if (_searchController.text.trim().isNotEmpty) ...[
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  leading: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                  ),
+                  title: Text(
+                    'Ajouter "${_searchController.text.trim()}"',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.primaryDark),
+                  ),
+                  subtitle: const Text(
+                    'Introuvable dans la base ? Saisir Nom, DCI, Forme, Boîte/Flacon et Labo',
+                    style: TextStyle(fontSize: 11, color: AppColors.slateMedium),
+                  ),
+                  trailing: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Ajouter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    onPressed: () async {
+                      final nav = Navigator.of(context);
+                      final query = _searchController.text.trim();
+                      final created = await CreateCustomMedicineDialog.show(
+                        context,
+                        initialName: query,
+                      );
+                      if (created != null) {
+                        nav.pop(created);
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
             const Divider(),
 
             // Liste épurée : SEULEMENT Nom Commercial, Forme, et Boîte ou Flacon
@@ -167,13 +221,13 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                                 Text(
                                   _searchController.text.trim().isEmpty
                                       ? 'Aucun médicament trouvé.'
-                                      : 'Aucun résultat pour "${_searchController.text}"',
+                                      : 'Aucun résultat pour "${_searchController.text.trim()}"',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                 ),
                                 const SizedBox(height: 6),
                                 const Text(
-                                  'Ce médicament n\'est pas dans la base de données ?\nVous pouvez créer sa fiche manuellement en quelques secondes.',
+                                  'Ce médicament ne figure pas dans la base de données ?\nAjoutez-le avec son Nom, sa DCI, sa Forme, sa Boîte/Flacon et son Laboratoire.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(color: AppColors.slateMedium, fontSize: 13),
                                 ),
@@ -182,22 +236,27 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppColors.primaryBlue,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
                                   onPressed: () async {
                                     final nav = Navigator.of(context);
-                                    final query = _searchController.text;
+                                    final query = _searchController.text.trim();
                                     final created = await CreateCustomMedicineDialog.show(
                                       context,
-                                      initialName: query,
+                                      initialName: query.isNotEmpty ? query : null,
                                     );
                                     if (created != null) {
                                       nav.pop(created);
                                     }
                                   },
                                   icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                                  label: const Text('Créer et ajouter ce médicament'),
+                                  label: Text(
+                                    _searchController.text.trim().isNotEmpty
+                                        ? 'Ajouter "${_searchController.text.trim()}"'
+                                        : 'Ajouter ce médicament',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ],
                             ),

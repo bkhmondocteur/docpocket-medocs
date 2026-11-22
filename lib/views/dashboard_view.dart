@@ -22,6 +22,7 @@ import 'widgets/create_custom_medicine_dialog.dart';
 import 'widgets/expiry_notifications_dialog.dart';
 import '../../core/services/auto_backup_service.dart';
 import '../../core/services/expiry_notification_service.dart';
+import '../../core/services/medicines_catalog_service.dart';
 
 /// Tableau de Bord principal de DocPocket Medocs
 class DashboardView extends StatefulWidget {
@@ -252,27 +253,6 @@ class _DashboardViewState extends State<DashboardView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'dashboard_fab_scanner',
-        onPressed: () async {
-          final code = await CameraScannerModal.show(context);
-          if (code != null && mounted) {
-            _showQuickScanDialog(code);
-          }
-        },
-        backgroundColor: AppColors.primaryBlue,
-        elevation: 3.5,
-        icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 21),
-        label: const Text(
-          'Scanner',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.3,
-            fontSize: 14,
-          ),
-        ),
-      ),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
@@ -839,20 +819,62 @@ class _DashboardViewState extends State<DashboardView> {
                         ),
                         const SizedBox(height: 20),
                         if (_searchController.text.isNotEmpty || _selectedFilter != null)
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _selectedFilter = null);
-                              _loadData();
-                            },
-                            icon: const Icon(Icons.refresh_rounded, size: 18),
-                            label: const Text('Réinitialiser les filtres'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primaryBlue,
-                              side: const BorderSide(color: AppColors.primaryBlue),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              if (_searchController.text.trim().isNotEmpty)
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryBlue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                                  label: Text(
+                                    'Ajouter "${_searchController.text.trim()}" en stock',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  onPressed: () async {
+                                    final query = _searchController.text.trim();
+                                    final catalogMatches = await MedicinesCatalogService.instance.search(query);
+                                    if (!mounted) return;
+                                    CatalogMedicine? chosen;
+                                    if (catalogMatches.isNotEmpty) {
+                                      chosen = await MedicineCatalogPickerDialog.show(this.context, initialQuery: query);
+                                    } else {
+                                      chosen = await CreateCustomMedicineDialog.show(this.context, initialName: query);
+                                    }
+                                    if (chosen != null && mounted) {
+                                      Navigator.of(this.context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => StockEntryView(initialCatalogMedicine: chosen),
+                                        ),
+                                      ).then((_) {
+                                        _searchController.clear();
+                                        _loadData();
+                                      });
+                                    }
+                                  },
+                                ),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _selectedFilter = null);
+                                  _loadData();
+                                },
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: const Text('Réinitialiser les filtres'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryBlue,
+                                  side: const BorderSide(color: AppColors.primaryBlue),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
                           )
                         else
                           Wrap(

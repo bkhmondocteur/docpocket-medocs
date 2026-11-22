@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
 /// Modèle d'une release GitHub
@@ -25,13 +29,13 @@ class AppReleaseInfo {
   });
 }
 
-/// Service de vérification et de téléchargement des mises à jour depuis GitHub Releases
+/// Service de vérification, de téléchargement direct et d'installation des mises à jour
 class AppUpdateService {
   static final AppUpdateService instance = AppUpdateService._internal();
   AppUpdateService._internal();
 
-  static const String currentVersion = '1.0.7';
-  static const int currentBuildNumber = 8;
+  static const String currentVersion = '1.0.8';
+  static const int currentBuildNumber = 9;
 
   static const String githubOwner = 'bkhmondocteur';
   static const String githubRepo = 'docpocket-medocs';
@@ -54,7 +58,7 @@ class AppUpdateService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        final tagName = data['tag_name']?.toString() ?? 'v1.0.6';
+        final tagName = data['tag_name']?.toString() ?? 'v1.0.8';
         final title = data['name']?.toString() ?? tagName;
         final notes = data['body']?.toString() ?? '';
         final htmlUrl = data['html_url']?.toString() ?? releasesUrl;
@@ -88,7 +92,7 @@ class AppUpdateService {
         );
       }
     } catch (e) {
-      debugPrint('CheckForUpdate API call error: $e');
+      debugPrint('[AppUpdateService] CheckForUpdate API error: $e');
     }
 
     // Fallback résilient si GitHub API est indisponible ou rate-limité (60 req/h)
@@ -101,6 +105,83 @@ class AppUpdateService {
       publishedAt: null,
       isNewer: false,
     );
+  }
+
+  /// Télécharge le fichier APK directement dans l'application avec progression en temps réel,
+  /// puis déclenche automatiquement l'installateur de paquets Android.
+  Future<void> downloadAndInstallApk({
+    required String url,
+    required void Function(double progress, int receivedBytes, int totalBytes) onProgress,
+    required void Function(String filePath) onDownloaded,
+    required void Function(String error) onError,
+  }) async {
+    if (kIsWeb) {
+      // Sur le web, ouvrir directement le lien dans un nouvel onglet
+      await openUrl(url);
+      return;
+    }
+
+    http.Client? client;
+    try {
+      client = http.Client();
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await client.send(request);
+
+      if (response.statusCode >= 400) {
+        onError('Erreur de téléchargement serveur (Code HTTP ${response.statusCode})');
+        return;
+      }
+
+      final contentLength = response.contentLength ?? 0;
+      final tempDir = await getTemporaryDirectory();
+      final file = File(p.join(tempDir.path, 'DocPocket-Medocs-Update.apk'));
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final sink = file.openWrite();
+      int received = 0;
+
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        final progress = contentLength > 0 ? (received / contentLength).clamp(0.0, 1.0) : 0.0;
+        onProgress(progress, received, contentLength);
+      }
+
+      await sink.flush();
+      await sink.close();
+      client.close();
+
+      onDownloaded(file.path);
+
+      // Lancer automatiquement l'installateur Android
+      await installApk(file.path);
+    } catch (e) {
+      client?.close();
+      debugPrint('[AppUpdateService] Erreur downloadAndInstallApk: $e');
+      onError('Échec du téléchargement direct : $e');
+    }
+  }
+
+  /// Déclenche l'installateur d'application Android via open_filex
+  Future<bool> installApk(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        debugPrint('[AppUpdateService] Le fichier APK n\'existe pas : $filePath');
+        return false;
+      }
+
+      final result = await OpenFilex.open(
+        filePath,
+        type: 'application/vnd.android.package-archive',
+      );
+      return result.type == ResultType.done;
+    } catch (e) {
+      debugPrint('[AppUpdateService] Erreur installApk: $e');
+      return false;
+    }
   }
 
   /// Ouvre l'URL dans le navigateur externe avec gestion multi-niveaux et tolérance aux pannes
@@ -128,7 +209,7 @@ class AppUpdateService {
         mode: LaunchMode.inAppBrowserView,
       );
     } catch (e) {
-      debugPrint('Erreur launchUrl pour $url : $e');
+      debugPrint('[AppUpdateService] Erreur launchUrl pour $url : $e');
       try {
         // Ultime tentative directe sans mode spécifié
         return await launchUrl(Uri.parse(url));
@@ -148,7 +229,7 @@ class AppUpdateService {
     return await openUrl(releasesUrl);
   }
 
-  /// Compare deux tags de version (ex: 'v1.0.6' vs '1.0.5')
+  /// Compare deux tags de version (ex: 'v1.0.8' vs '1.0.7')
   /// Renvoie > 0 si v1 > v2, 0 si égal, < 0 si v1 < v2
   int _compareVersions(String v1, String v2) {
     final clean1 = v1.replaceAll(RegExp(r'[^0-9.]'), '');

@@ -47,14 +47,19 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
   ];
 
   final List<String> _commonPackagings = [
+    'Boîte de 7',
     'Boîte de 10',
     'Boîte de 14',
+    'Boîte de 15',
     'Boîte de 20',
     'Boîte de 28',
     'Boîte de 30',
+    'Boîte de 60',
     'Flacon de 60 ml',
     'Flacon de 100 ml',
     'Flacon de 125 ml',
+    'Flacon de 150 ml',
+    'Flacon de 200 ml',
     'Tube de 30 g',
     'Tube de 50 g',
   ];
@@ -240,15 +245,15 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
                     controller: _packagingController,
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
-                      labelText: 'Boîte de combien ou Volume *',
-                      hintText: 'Ex: Boîte de 7, Boîte de 30, Flacon de 100 ml, Tube de 30 g...',
+                      labelText: 'Boîte de combien ou Flacon de combien *',
+                      hintText: 'Ex: Boîte de 7, Boîte de 14, Boîte de 28, Flacon de 100 ml, Flacon de 125 ml...',
                       prefixIcon: const Icon(Icons.inventory_2_rounded, color: AppColors.primaryBlue),
                       filled: true,
                       fillColor: Colors.grey.shade50,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Le conditionnement ou volume est obligatoire' : null,
+                        (v == null || v.trim().isEmpty) ? 'Veuillez préciser la boîte ou le flacon (ex: Boîte de 14, Flacon de 100 ml)' : null,
                   ),
                   const SizedBox(height: 6),
                   Wrap(

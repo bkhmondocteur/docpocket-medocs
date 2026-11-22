@@ -15,8 +15,9 @@ import 'widgets/medicine_catalog_picker.dart';
 /// Affichage épuré : SEULEMENT Nom Commercial, Forme et Boîte/Flacon
 class StockEntryView extends StatefulWidget {
   final String? initialBarcode;
+  final CatalogMedicine? initialCatalogMedicine;
 
-  const StockEntryView({super.key, this.initialBarcode});
+  const StockEntryView({super.key, this.initialBarcode, this.initialCatalogMedicine});
 
   @override
   State<StockEntryView> createState() => _StockEntryViewState();
@@ -52,7 +53,11 @@ class _StockEntryViewState extends State<StockEntryView> {
     // Pré-chargement silencieux du catalogue des médicaments
     MedicinesCatalogService.instance.loadCatalog();
 
-    if (widget.initialBarcode != null) {
+    if (widget.initialCatalogMedicine != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _applyCatalogMedicine(widget.initialCatalogMedicine!);
+      });
+    } else if (widget.initialBarcode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _processBarcode(widget.initialBarcode!);
       });
