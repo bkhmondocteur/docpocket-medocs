@@ -207,6 +207,14 @@ class SupabaseSyncService {
 
     try {
       final url = Uri.parse('$_supabaseUrl/rest/v1/cabinet_delegations');
+      final payload = {
+        'id': delegation.id,
+        'cabinet_id': delegation.cabinetId,
+        'secretary_name': delegation.secretaryName,
+        'access_code': delegation.accessCode,
+        'is_active': delegation.isActive,
+        'created_at': delegation.createdAt.toIso8601String(),
+      };
       await http.post(
         url,
         headers: {
@@ -215,7 +223,7 @@ class SupabaseSyncService {
           'Content-Type': 'application/json',
           'Prefer': 'resolution=merge-duplicates',
         },
-        body: json.encode(delegation.toMap()),
+        body: json.encode(payload),
       ).timeout(const Duration(seconds: 8));
       debugPrint('[SupabaseSyncService] Délégation poussée vers Supabase : ${delegation.accessCode}');
     } catch (e) {
@@ -242,7 +250,15 @@ class SupabaseSyncService {
       if (res.statusCode == 200) {
         final list = json.decode(res.body) as List<dynamic>;
         if (list.isNotEmpty) {
-          return list.first as Map<String, dynamic>;
+          final row = list.first as Map<String, dynamic>;
+          return {
+            'id': row['id'],
+            'cabinetId': row['cabinet_id'] ?? row['cabinetId'] ?? '',
+            'secretaryName': row['secretary_name'] ?? row['secretaryName'] ?? '',
+            'accessCode': row['access_code'] ?? row['accessCode'] ?? cleanCode,
+            'isActive': row['is_active'] ?? row['isActive'] ?? true,
+            'createdAt': row['created_at'] ?? row['createdAt'] ?? DateTime.now().toIso8601String(),
+          };
         }
       }
     } catch (e) {
