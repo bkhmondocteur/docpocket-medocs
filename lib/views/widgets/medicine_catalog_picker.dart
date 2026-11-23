@@ -54,18 +54,19 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Container(
         width: 600,
         height: 650,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Icon(Icons.medication_rounded, color: AppColors.primaryBlue, size: 28),
-                const SizedBox(width: 12),
+                const Icon(Icons.medication_rounded, color: AppColors.primaryBlue, size: 26),
+                const SizedBox(width: 10),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,32 +74,35 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                       Text(
                         'Choisir le Médicament',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
                           color: AppColors.slateDark,
                         ),
                       ),
                       Text(
-                        'Nom commercial, forme et conditionnement (boîte / flacon)',
-                        style: TextStyle(fontSize: 12, color: AppColors.slateMedium),
+                        'Nom, forme et conditionnement',
+                        style: TextStyle(fontSize: 11.5, color: AppColors.slateMedium),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // Champ de recherche rapide
             TextField(
               controller: _searchController,
               autofocus: true,
               decoration: InputDecoration(
-                hintText: 'Rechercher un médicament (ex: Doliprane, Augmentin, Kardegic)...',
+                hintText: 'Rechercher un médicament (Doliprane, etc.)...',
                 prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryBlue),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -110,27 +114,31 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                       )
                     : null,
                 filled: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 fillColor: AppColors.slateLight.withValues(alpha: 0.5),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
               onChanged: _performSearch,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             // Compteur de résultats & Bouton d'ajout manuel
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _isLoading
-                      ? 'Recherche en cours...'
-                      : '${_results.length} médicament(s) affiché(s)',
-                  style: const TextStyle(fontSize: 12, color: AppColors.slateMedium, fontStyle: FontStyle.italic),
+                Expanded(
+                  child: Text(
+                    _isLoading
+                        ? 'Recherche en cours...'
+                        : '${_results.length} résultat(s)',
+                    style: const TextStyle(fontSize: 12, color: AppColors.slateMedium, fontStyle: FontStyle.italic),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 TextButton.icon(
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     foregroundColor: AppColors.primaryBlue,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   ),
                   onPressed: () async {
                     final nav = Navigator.of(context);
@@ -144,11 +152,11 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                     }
                   },
                   icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                  label: const Text('+ Ajouter un médicament', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  label: const Text('Nouveau médicament', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
 
             // Bouton dynamique pour ajouter directement le nom saisi s'il n'est pas répertorié
             if (_searchController.text.trim().isNotEmpty) ...[
@@ -173,10 +181,14 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                   title: Text(
                     'Ajouter "${_searchController.text.trim()}"',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.primaryDark),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: const Text(
-                    'Introuvable dans la base ? Saisir Nom, DCI, Forme, Boîte/Flacon et Labo',
+                    'Introuvable dans la base ? Créer la fiche',
                     style: TextStyle(fontSize: 11, color: AppColors.slateMedium),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   trailing: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -270,84 +282,101 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                             final pkg = med.packaging;
                             final form = med.form;
 
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              leading: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  pkg.toLowerCase().contains('flacon')
-                                      ? Icons.medication_liquid_rounded
-                                      : Icons.medication_rounded,
-                                  color: AppColors.primaryBlue,
-                                  size: 24,
-                                ),
-                              ),
-                              // 1. NOM COMMERCIAL
-                              title: Text(
-                                med.cleanCommercialName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15.5,
-                                  color: AppColors.slateDark,
-                                ),
-                              ),
-                              // 2. FORME ET BOÎTE / FLACON DE COMBIEN
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Wrap(
-                                  spacing: 6,
-                                  runSpacing: 4,
+                            return InkWell(
+                              onTap: () => Navigator.of(context).pop(med),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                child: Row(
                                   children: [
-                                    if (form.isNotEmpty)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue.shade50,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: Colors.blue.shade200),
-                                        ),
-                                        child: Text(
-                                          form,
-                                          style: TextStyle(
-                                            color: Colors.blue.shade900,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 12,
-                                          ),
-                                        ),
+                                    Container(
+                                      padding: const EdgeInsets.all(7),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryLight,
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                    if (pkg.isNotEmpty)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: Colors.teal.shade50,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: Colors.teal.shade200),
-                                        ),
-                                        child: Text(
-                                          pkg,
-                                          style: TextStyle(
-                                            color: Colors.teal.shade900,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
+                                      child: Icon(
+                                        pkg.toLowerCase().contains('flacon')
+                                            ? Icons.medication_liquid_rounded
+                                            : Icons.medication_rounded,
+                                        color: AppColors.primaryBlue,
+                                        size: 22,
                                       ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            med.cleanCommercialName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14.5,
+                                              color: AppColors.slateDark,
+                                            ),
+                                          ),
+                                          if (form.isNotEmpty || pkg.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 3),
+                                              child: Wrap(
+                                                spacing: 6,
+                                                runSpacing: 4,
+                                                children: [
+                                                  if (form.isNotEmpty)
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.blue.shade50,
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(color: Colors.blue.shade200),
+                                                      ),
+                                                      child: Text(
+                                                        form,
+                                                        style: TextStyle(
+                                                          color: Colors.blue.shade900,
+                                                          fontWeight: FontWeight.w600,
+                                                          fontSize: 11.5,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  if (pkg.isNotEmpty)
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.teal.shade50,
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(color: Colors.teal.shade200),
+                                                      ),
+                                                      child: Text(
+                                                        pkg,
+                                                        style: TextStyle(
+                                                          color: Colors.teal.shade900,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 11.5,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primaryBlue,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        visualDensity: VisualDensity.compact,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                      onPressed: () => Navigator.of(context).pop(med),
+                                      child: const Text('Choisir', style: TextStyle(fontSize: 12)),
+                                    ),
                                   ],
                                 ),
-                              ),
-                              trailing: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryBlue,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                onPressed: () => Navigator.of(context).pop(med),
-                                child: const Text('Choisir'),
                               ),
                             );
                           },

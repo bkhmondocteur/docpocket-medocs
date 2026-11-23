@@ -89,11 +89,12 @@ class _ExpiryNotificationsDialogState extends State<ExpiryNotificationsDialog> {
     final summary = ExpiryNotificationService.instance.computeSummary(widget.medicines);
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         width: 620,
         constraints: const BoxConstraints(maxHeight: 740),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -101,37 +102,42 @@ class _ExpiryNotificationsDialogState extends State<ExpiryNotificationsDialog> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: summary.expired.isNotEmpty
                         ? AppColors.alertExpired.withValues(alpha: 0.12)
                         : Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     Icons.notifications_active_rounded,
                     color: summary.expired.isNotEmpty ? AppColors.alertExpired : Colors.orange.shade800,
-                    size: 26,
+                    size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Alertes Péremptions en Stock',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.slateDark),
+                        'Alertes Péremptions',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.slateDark),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
-                        'Uniquement pour les échantillons avec stock > 0',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                        'Échantillons avec stock > 0',
+                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
@@ -195,8 +201,9 @@ class _ExpiryNotificationsDialogState extends State<ExpiryNotificationsDialog> {
                             )
                           : const Icon(Icons.send_rounded, size: 18),
                       label: const Text(
-                        'Envoyer la notification sur le téléphone',
+                        'Notifier les alertes sur le téléphone',
                         style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       onPressed: summary.hasAlerts && !_isSending ? () => _triggerNotification(summary) : null,
                     ),

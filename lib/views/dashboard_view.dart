@@ -363,15 +363,15 @@ class _DashboardViewState extends State<DashboardView> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         shadowColor: Colors.black.withValues(alpha: 0.08),
-        leadingWidth: 54,
+        leadingWidth: 42,
         leading: Padding(
-          padding: const EdgeInsets.only(left: 14),
+          padding: const EdgeInsets.only(left: 8),
           child: Center(
             child: Container(
-              width: 38,
-              height: 38,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
@@ -381,33 +381,33 @@ class _DashboardViewState extends State<DashboardView> {
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
                 child: Image.asset(
                   'assets/images/logo.png',
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.medication_liquid_rounded,
                     color: AppColors.primaryBlue,
-                    size: 28,
+                    size: 26,
                   ),
                 ),
               ),
             ),
           ),
         ),
-        titleSpacing: 6,
+        titleSpacing: 4,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'DocPocket Medocs',
+              'DocPocket Médocs',
               style: TextStyle(
                 color: AppColors.slateDark,
                 fontWeight: FontWeight.w800,
-                fontSize: 16.5,
+                fontSize: 15,
                 letterSpacing: -0.3,
               ),
               maxLines: 1,
@@ -415,12 +415,10 @@ class _DashboardViewState extends State<DashboardView> {
             ),
             const SizedBox(height: 1),
             Text(
-              LicenseService.instance.isDoctor
-                  ? '${LicenseService.instance.userDisplayName} • Stock'
-                  : '${LicenseService.instance.userDisplayName} • Stock',
+              LicenseService.instance.userDisplayName,
               style: const TextStyle(
                 color: AppColors.primaryBlue,
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
@@ -430,6 +428,9 @@ class _DashboardViewState extends State<DashboardView> {
         ),
         actions: [
           IconButton(
+            visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             icon: Icon(
               Icons.cloud_sync_rounded,
               color: SupabaseSyncService.instance.status == SyncStatus.synced
@@ -437,7 +438,7 @@ class _DashboardViewState extends State<DashboardView> {
                   : (SupabaseSyncService.instance.status == SyncStatus.syncing
                       ? Colors.orange.shade700
                       : AppColors.slateDark),
-              size: 22,
+              size: 21,
             ),
             tooltip: 'Supabase Cloud : ${SupabaseSyncService.instance.lastSyncMessage}',
             onPressed: () {
@@ -445,11 +446,14 @@ class _DashboardViewState extends State<DashboardView> {
             },
           ),
           IconButton(
+            visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             icon: Badge(
               isLabelVisible: _expirySummary.hasAlerts,
               label: Text('${_expirySummary.totalCount}'),
               backgroundColor: _expirySummary.expired.isNotEmpty ? AppColors.alertExpired : Colors.orange.shade800,
-              child: const Icon(Icons.notifications_outlined, color: AppColors.slateDark, size: 22),
+              child: const Icon(Icons.notifications_outlined, color: AppColors.slateDark, size: 21),
             ),
             tooltip: 'Alertes péremptions (${_expirySummary.totalCount})',
             onPressed: () {
@@ -461,18 +465,18 @@ class _DashboardViewState extends State<DashboardView> {
             },
           ),
           Container(
-            margin: const EdgeInsets.symmetric(vertical: 9),
+            margin: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.35)),
             ),
             child: IconButton(
-              icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryDark, size: 20),
+              icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryDark, size: 19),
               tooltip: 'Scanner caméra',
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.all(7),
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               onPressed: () async {
                 final code = await CameraScannerModal.show(context);
                 if (code != null && mounted) {
@@ -481,10 +485,11 @@ class _DashboardViewState extends State<DashboardView> {
               },
             ),
           ),
-          const SizedBox(width: 4),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded, color: AppColors.slateDark),
+            icon: const Icon(Icons.more_vert_rounded, color: AppColors.slateDark, size: 21),
             tooltip: 'Menu & Outils',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 32),
             onSelected: (val) {
               switch (val) {
                 case 'secretary':
@@ -717,7 +722,7 @@ class _DashboardViewState extends State<DashboardView> {
                 children: [
                   Expanded(
                     child: BigTouchButton(
-                      label: 'Entrée en stock',
+                      label: 'Entrée Stock',
                       subtitle: 'Réception délégué',
                       icon: Icons.add_box_rounded,
                       color: AppColors.primaryBlue,
@@ -731,7 +736,7 @@ class _DashboardViewState extends State<DashboardView> {
                   const SizedBox(width: 14),
                   Expanded(
                     child: BigTouchButton(
-                      label: 'Sortie / Remise',
+                      label: 'Sortie Stock',
                       subtitle: 'Délivrance FEFO',
                       icon: Icons.output_rounded,
                       color: AppColors.primaryDark,
@@ -1326,7 +1331,7 @@ class _DashboardViewState extends State<DashboardView> {
                           Icon(Icons.add_circle_outline_rounded, size: 15, color: Colors.teal.shade800),
                           const SizedBox(width: 4),
                           Text(
-                            '+ Boîte identique',
+                            'Boîte identique',
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.bold,
@@ -1357,7 +1362,7 @@ class _DashboardViewState extends State<DashboardView> {
                           Icon(Icons.add_rounded, size: 15, color: AppColors.primaryDark),
                           SizedBox(width: 4),
                           Text(
-                            '+ Nouveau lot',
+                            'Nouveau lot',
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.bold,

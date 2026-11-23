@@ -36,20 +36,20 @@ class BigTouchButton extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 22, color: color),
+                child: Icon(icon, size: 20, color: color),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -59,11 +59,12 @@ class BigTouchButton extends StatelessWidget {
                       label,
                       style: TextStyle(
                         color: color,
-                        fontSize: 14.5,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: -0.2,
                         height: 1.15,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (subtitle != null) ...[
@@ -72,10 +73,11 @@ class BigTouchButton extends StatelessWidget {
                         subtitle!,
                         style: TextStyle(
                           color: color.withValues(alpha: 0.85),
-                          fontSize: 10.5,
+                          fontSize: 10,
+                          letterSpacing: -0.2,
                           height: 1.15,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -100,20 +102,20 @@ class BigTouchButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.22),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 22, color: textColor),
+              child: Icon(icon, size: 20, color: textColor),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -123,11 +125,12 @@ class BigTouchButton extends StatelessWidget {
                     label,
                     style: TextStyle(
                       color: textColor,
-                      fontSize: 14.5,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
                       height: 1.15,
                     ),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (subtitle != null) ...[
@@ -136,10 +139,11 @@ class BigTouchButton extends StatelessWidget {
                       subtitle!,
                       style: TextStyle(
                         color: textColor.withValues(alpha: 0.9),
-                        fontSize: 10.5,
+                        fontSize: 10,
+                        letterSpacing: -0.2,
                         height: 1.15,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],

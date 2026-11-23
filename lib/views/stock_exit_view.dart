@@ -191,7 +191,7 @@ class _StockExitViewState extends State<StockExitView> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Sortie / Remise au Patient', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Sortie de Stock', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.primaryDark,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -697,9 +697,9 @@ class _StockExitViewState extends State<StockExitView> {
                             TextFormField(
                               controller: _patientController,
                               decoration: const InputDecoration(
-                                labelText: 'Nom ou Initiales (ex: DUPONT J.)',
+                                labelText: 'Patient (Nom ou Initiales)',
                                 prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                                hintText: 'Optionnel',
+                                hintText: 'ex: DUPONT J. (Optionnel)',
                                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               ),
                             ),

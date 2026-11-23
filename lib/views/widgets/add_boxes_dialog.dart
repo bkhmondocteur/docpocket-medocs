@@ -88,11 +88,12 @@ class _AddBoxesDialogState extends State<AddBoxesDialog> {
     final batches = med.batches;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
         child: Padding(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(18),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -245,15 +246,14 @@ class _AddBoxesDialogState extends State<AddBoxesDialog> {
               const SizedBox(height: 8),
 
               // Raccourcis +1, +2, +5, +10
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
                 children: [
                   _quickQtyChip('+1 boîte', 1),
-                  const SizedBox(width: 8),
                   _quickQtyChip('+2 boîtes', 2),
-                  const SizedBox(width: 8),
                   _quickQtyChip('+5 boîtes', 5),
-                  const SizedBox(width: 8),
                   _quickQtyChip('+10 boîtes', 10),
                 ],
               ),

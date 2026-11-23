@@ -314,7 +314,7 @@ class _StockEntryViewState extends State<StockEntryView> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Entrée en Stock (Réception)', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Entrée en Stock', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.primaryBlue,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -385,7 +385,8 @@ class _StockEntryViewState extends State<StockEntryView> {
                     TextFormField(
                       controller: _cipController,
                       decoration: InputDecoration(
-                        labelText: 'Code Scanné (Code-barres / DataMatrix / QR) *',
+                        labelText: 'Code Médicament (CIP / GTIN / QR) *',
+                        hintText: 'Scannez ou saisissez le code',
                         prefixIcon: const Icon(Icons.qr_code_2_rounded, color: AppColors.primaryBlue),
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.search_rounded),
@@ -592,8 +593,8 @@ class _StockEntryViewState extends State<StockEntryView> {
                                 onPressed: _openCreateCustomMedicineDialog,
                                 icon: const Icon(Icons.add_circle_outline_rounded),
                                 label: const Text(
-                                  'Médicament hors base ? Ajouter manuellement',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  'Ajouter un médicament hors base',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primaryBlue,
@@ -632,14 +633,15 @@ class _StockEntryViewState extends State<StockEntryView> {
                                   child: TextFormField(
                                     controller: _batchController,
                                     decoration: const InputDecoration(
-                                      labelText: 'Numéro de lot *',
-                                      hintText: 'ex: LOT-2026-X',
-                                      prefixIcon: Icon(Icons.tag_rounded),
+                                      labelText: 'N° de Lot *',
+                                      hintText: 'ex: LOT-2026',
+                                      prefixIcon: Icon(Icons.tag_rounded, size: 20),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                                     ),
-                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'N° de lot requis' : null,
+                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'N° requis' : null,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: TextFormField(
                                     controller: _expiryController,
@@ -647,9 +649,10 @@ class _StockEntryViewState extends State<StockEntryView> {
                                     keyboardType: TextInputType.number,
                                     inputFormatters: [StrictDateInputFormatter()],
                                     decoration: const InputDecoration(
-                                      labelText: 'Péremption * (MM/AAAA)',
-                                      hintText: 'ex: 11/2028',
-                                      prefixIcon: Icon(Icons.calendar_month_rounded),
+                                      labelText: 'Péremption *',
+                                      hintText: 'MM/AAAA',
+                                      prefixIcon: Icon(Icons.calendar_month_rounded, size: 20),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                                     ),
                                     validator: (v) {
                                       final res = StrictDateValidator.validate(v);
@@ -663,8 +666,9 @@ class _StockEntryViewState extends State<StockEntryView> {
                             TextFormField(
                               controller: _serialController,
                               decoration: const InputDecoration(
-                                labelText: 'N° de Série unitaire (Optionnel / DataMatrix)',
-                                prefixIcon: Icon(Icons.fingerprint_rounded),
+                                labelText: 'N° de Série (Optionnel)',
+                                prefixIcon: Icon(Icons.fingerprint_rounded, size: 20),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                               ),
                             ),
                           ],

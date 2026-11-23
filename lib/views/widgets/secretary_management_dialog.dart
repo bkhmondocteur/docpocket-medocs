@@ -68,12 +68,18 @@ class _SecretaryManagementDialogState extends State<SecretaryManagementDialog> {
     final delegations = LicenseService.instance.delegations;
 
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Row(
         children: [
           Icon(Icons.badge_rounded, color: AppColors.primaryBlue),
           SizedBox(width: 10),
-          Text('Gestion Accès Secrétaire'),
+          Expanded(
+            child: Text(
+              'Gestion Accès Secrétaire',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       content: SizedBox(

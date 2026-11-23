@@ -155,7 +155,7 @@ class _MedicineDetailViewState extends State<MedicineDetailView> {
                           if (res == true) _loadHistory();
                         },
                         icon: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('+ Nouveau lot', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        label: const Text('Nouveau lot', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -236,7 +236,7 @@ class _MedicineDetailViewState extends State<MedicineDetailView> {
                                           Icon(Icons.add_circle_outline_rounded, size: 13, color: Colors.teal.shade800),
                                           const SizedBox(width: 3),
                                           Text(
-                                            '+ Boîte',
+                                            'Ajouter boîte',
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,

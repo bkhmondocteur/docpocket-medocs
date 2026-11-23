@@ -104,11 +104,12 @@ class _AddBatchDialogState extends State<AddBatchDialog> {
     final med = widget.medicine;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(18),
           child: Form(
             key: _formKey,
             child: Column(
@@ -180,7 +181,7 @@ class _AddBatchDialogState extends State<AddBatchDialog> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [StrictDateInputFormatter()],
                   decoration: InputDecoration(
-                    labelText: 'Date de péremption (MM/AAAA) *',
+                    labelText: 'Péremption (MM/AAAA) *',
                     hintText: 'Ex: 11/2028',
                     prefixIcon: const Icon(Icons.calendar_month_rounded, color: AppColors.primaryBlue),
                     filled: true,
