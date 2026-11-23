@@ -27,10 +27,10 @@ class SupabaseSyncService {
   static const String _prefKeySupabaseAnonKey = 'docpocket_supabase_anon_key_v1';
   static const String _prefKeyAutoSync = 'docpocket_supabase_autosync_v1';
 
-  // Configuration cloud Supabase par défaut (prête à l'emploi ou personnalisable par le cabinet)
-  static const String defaultSupabaseUrl = 'https://tnqydlfxkrtfeyxwbvuo.supabase.co';
+  // Configuration cloud Supabase par défaut (liée à votre projet officiel)
+  static const String defaultSupabaseUrl = 'https://zigfpxuphdcqnvasxdci.supabase.co';
   static const String defaultSupabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRucXlkbGZ4a3J0ZmV5eHdidnVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzIzMzg1NTAsImV4cCI6MjA0NzkxNDU1MH0.example-key';
+      'sb_publishable_7CSykS4ypLNhmEFTdAf6bw_8iaJeeG_';
 
   String _supabaseUrl = '';
   String _supabaseAnonKey = '';
@@ -56,8 +56,16 @@ class SupabaseSyncService {
     if (_isInitialized) return;
 
     final prefs = await SharedPreferences.getInstance();
-    _supabaseUrl = prefs.getString(_prefKeySupabaseUrl) ?? defaultSupabaseUrl;
-    _supabaseAnonKey = prefs.getString(_prefKeySupabaseAnonKey) ?? defaultSupabaseAnonKey;
+    final savedUrl = prefs.getString(_prefKeySupabaseUrl);
+    if (savedUrl == null || savedUrl.contains('tnqydlfxkrtfeyxwbvuo') || savedUrl.isEmpty) {
+      _supabaseUrl = defaultSupabaseUrl;
+      _supabaseAnonKey = defaultSupabaseAnonKey;
+      await prefs.setString(_prefKeySupabaseUrl, _supabaseUrl);
+      await prefs.setString(_prefKeySupabaseAnonKey, _supabaseAnonKey);
+    } else {
+      _supabaseUrl = savedUrl;
+      _supabaseAnonKey = prefs.getString(_prefKeySupabaseAnonKey) ?? defaultSupabaseAnonKey;
+    }
     _isAutoSyncEnabled = prefs.getBool(_prefKeyAutoSync) ?? true;
 
     // Tentative d'initialisation du SDK Supabase si non déjà fait
