@@ -267,6 +267,7 @@ class LicenseService {
   Future<CabinetSession?> activateSecretary({
     required String secretaryName,
     required String accessCode,
+    String? cabinetId,
   }) async {
     final cleanCode = accessCode.trim().toUpperCase();
     final cleanName = normalize(secretaryName);
@@ -281,13 +282,18 @@ class LicenseService {
     }
 
     // 2. Si pas trouvé localement (par exemple sur un autre appareil / PWA), extraire ou valider
-    final cabId = found?.cabinetId ?? (_savedDoctorProfile?.cabinetId ?? 'CAB_DELEGATED');
+    final resolvedCabinetId = cabinetId ?? found?.cabinetId ?? _savedDoctorProfile?.cabinetId;
+    if (resolvedCabinetId == null || resolvedCabinetId.isEmpty) {
+      debugPrint('[LicenseService] Aucun cabinet associé à ce code de délégation.');
+      return null;
+    }
+
     final docName = _savedDoctorProfile?.fullName ?? 'Dr. Titulaire';
 
     final delegation = found ??
         SecretaryDelegation(
           id: 'DEL_REMOTE_${DateTime.now().millisecondsSinceEpoch}',
-          cabinetId: cabId,
+          cabinetId: resolvedCabinetId,
           secretaryName: cleanName,
           accessCode: cleanCode,
           isActive: true,

@@ -116,16 +116,19 @@ class _WelcomeAuthViewState extends State<WelcomeAuthView> with SingleTickerProv
       }
 
       // 1. Tenter d'abord la validation locale ou distante Supabase
+      String? remoteCabinetId;
       try {
         final remoteDel = await SupabaseSyncService.instance.findRemoteDelegation(code);
         if (remoteDel != null) {
-          debugPrint('[WelcomeAuth] Délégation distante validée pour le cabinet : ${remoteDel['cabinet_id']}');
+          remoteCabinetId = (remoteDel['cabinet_id'] ?? remoteDel['cabinetId']) as String?;
+          debugPrint('[WelcomeAuth] Délégation distante validée pour le cabinet : $remoteCabinetId');
         }
       } catch (_) {}
 
       final session = await LicenseService.instance.activateSecretary(
         secretaryName: name,
         accessCode: code,
+        cabinetId: remoteCabinetId,
       );
 
       if (session == null) {

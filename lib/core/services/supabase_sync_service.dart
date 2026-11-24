@@ -158,8 +158,12 @@ class SupabaseSyncService {
           if (remoteStockJson.isNotEmpty && remoteUpdatedBy != operatorName) {
             final lastLocalUpdate = _lastSyncTime;
             if (lastLocalUpdate == null || (remoteUpdatedAt != null && remoteUpdatedAt.isAfter(lastLocalUpdate))) {
-              debugPrint('[SupabaseSyncService] Fusion du stock distant mis à jour par : $remoteUpdatedBy');
-              await DatabaseService.instance.importBackupJson(remoteStockJson);
+              try {
+                debugPrint('[SupabaseSyncService] Fusion du stock distant mis à jour par : $remoteUpdatedBy');
+                await DatabaseService.instance.importBackupJson(remoteStockJson);
+              } catch (err) {
+                debugPrint('[SupabaseSyncService] Erreur import stock distant ignorée : $err');
+              }
             }
           }
         }
@@ -251,10 +255,12 @@ class SupabaseSyncService {
         final list = json.decode(res.body) as List<dynamic>;
         if (list.isNotEmpty) {
           final row = list.first as Map<String, dynamic>;
+          final cId = (row['cabinet_id'] ?? row['cabinetId'] ?? '').toString();
           return {
             'id': row['id'],
-            'cabinetId': row['cabinet_id'] ?? row['cabinetId'] ?? '',
-            'secretaryName': row['secretary_name'] ?? row['secretaryName'] ?? '',
+            'cabinet_id': cId,
+            'cabinetId': cId,
+            'secretary_name': row['secretary_name'] ?? row['secretaryName'] ?? '',
             'accessCode': row['access_code'] ?? row['accessCode'] ?? cleanCode,
             'isActive': row['is_active'] ?? row['isActive'] ?? true,
             'createdAt': row['created_at'] ?? row['createdAt'] ?? DateTime.now().toIso8601String(),
