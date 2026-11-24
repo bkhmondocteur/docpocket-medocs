@@ -199,12 +199,10 @@ class _CloudSyncDialogState extends State<CloudSyncDialog> {
                       Text(
                         'Cabinet ID : ${license.activeCabinetId}',
                         style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: AppColors.slateDark),
-                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         'Session active : ${license.userDisplayName} (${license.currentSession?.role.label ?? "Non connecté"})',
                         style: const TextStyle(fontSize: 12, color: AppColors.slateMedium),
-                        overflow: TextOverflow.ellipsis,
                       ),
                       if (sync.lastSyncTime != null)
                         Text(

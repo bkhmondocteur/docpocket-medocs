@@ -196,6 +196,18 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _importBackupJson() async {
+    if (!LicenseService.instance.isDoctor) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Action réservée exclusivement au Médecin titulaire.'),
+            backgroundColor: AppColors.alertExpired,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       final files = await FilePicker.pickFiles(
         type: FileType.custom,
@@ -207,8 +219,13 @@ class _DashboardViewState extends State<DashboardView> {
         final content = utf8.decode(bytes);
 
         if (content.isNotEmpty) {
-          await DatabaseService.instance.importBackupJson(content);
+          await DatabaseService.instance.importBackupJson(content, replace: true);
           await _loadData();
+          if (SupabaseSyncService.instance.isConfigured) {
+            await SupabaseSyncService.instance.syncStock(
+              actionDescription: 'Restauration sauvegarde JSON par le Médecin',
+            );
+          }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -533,13 +550,17 @@ class _DashboardViewState extends State<DashboardView> {
                   _exportBackupJson();
                   break;
                 case 'import_json':
-                  _importBackupJson();
+                  if (LicenseService.instance.isDoctor) {
+                    _importBackupJson();
+                  }
                   break;
                 case 'export_csv':
                   _exportCsv();
                   break;
                 case 'clear_stock':
-                  _confirmClearStock();
+                  if (LicenseService.instance.isDoctor) {
+                    _confirmClearStock();
+                  }
                   break;
               }
             },
@@ -672,27 +693,29 @@ class _DashboardViewState extends State<DashboardView> {
                   ],
                 ),
               ),
-              const PopupMenuItem(
-                value: 'import_json',
-                child: Row(
-                  children: [
-                    Icon(Icons.file_upload_rounded, color: AppColors.slateMedium),
-                    SizedBox(width: 10),
-                    Text('Restaurer une sauvegarde (JSON)'),
-                  ],
+              if (LicenseService.instance.isDoctor) ...[
+                const PopupMenuItem(
+                  value: 'import_json',
+                  child: Row(
+                    children: [
+                      Icon(Icons.file_upload_rounded, color: AppColors.slateMedium),
+                      SizedBox(width: 10),
+                      Text('Restaurer une sauvegarde (JSON)'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'clear_stock',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_sweep_rounded, color: AppColors.alertExpired),
-                    SizedBox(width: 10),
-                    Text('Vider le stock (remise à zéro)', style: TextStyle(color: AppColors.alertExpired)),
-                  ],
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'clear_stock',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_sweep_rounded, color: AppColors.alertExpired),
+                      SizedBox(width: 10),
+                      Text('Vider le stock (remise à zéro)', style: TextStyle(color: AppColors.alertExpired)),
+                    ],
+                  ),
                 ),
-              ),
+              ],
               const PopupMenuDivider(),
               const PopupMenuItem(
                 value: 'logout',
@@ -1383,6 +1406,18 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _confirmClearStock() async {
+    if (!LicenseService.instance.isDoctor) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Action réservée exclusivement au Médecin titulaire.'),
+            backgroundColor: AppColors.alertExpired,
+          ),
+        );
+      }
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1413,6 +1448,11 @@ class _DashboardViewState extends State<DashboardView> {
     if (confirm == true && mounted) {
       await DatabaseService.instance.clearAllStock();
       await _loadData();
+      if (SupabaseSyncService.instance.isConfigured) {
+        await SupabaseSyncService.instance.syncStock(
+          actionDescription: 'Remise à zéro du stock par le Médecin',
+        );
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

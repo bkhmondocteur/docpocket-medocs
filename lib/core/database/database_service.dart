@@ -206,6 +206,9 @@ class DatabaseService {
       } catch (_) {}
     }
     await AutoBackupService.instance.triggerAutoBackup();
+    if (SupabaseSyncService.instance.isAutoSyncEnabled && LicenseService.instance.isAuthenticated) {
+      SupabaseSyncService.instance.syncStock(actionDescription: 'Remise à zéro du stock par le Médecin');
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -533,9 +536,14 @@ class DatabaseService {
     return const JsonEncoder.withIndent('  ').convert(exportData);
   }
 
-  Future<void> importBackupJson(String jsonString) async {
+  Future<void> importBackupJson(String jsonString, {bool replace = true}) async {
     final decoded = json.decode(jsonString) as Map<String, dynamic>;
     final medsJson = decoded['medicines'] as List<dynamic>? ?? [];
+
+    if (replace) {
+      _medicines.clear();
+      _movements.clear();
+    }
 
     for (final item in medsJson) {
       final map = item as Map<String, dynamic>;
