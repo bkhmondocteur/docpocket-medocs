@@ -124,6 +124,23 @@ class CabinetSession {
   bool get isDoctor => role == UserRole.doctor;
   bool get isSecretary => role == UserRole.secretary;
 
+  CabinetSession copyWith({
+    UserRole? role,
+    String? cabinetId,
+    String? displayName,
+    DoctorProfile? doctor,
+    SecretaryDelegation? secretary,
+    DateTime? loggedAt,
+  }) =>
+      CabinetSession(
+        role: role ?? this.role,
+        cabinetId: cabinetId ?? this.cabinetId,
+        displayName: displayName ?? this.displayName,
+        doctor: doctor ?? this.doctor,
+        secretary: secretary ?? this.secretary,
+        loggedAt: loggedAt ?? this.loggedAt,
+      );
+
   Map<String, dynamic> toMap() => {
         'role': role.name,
         'cabinetId': cabinetId,

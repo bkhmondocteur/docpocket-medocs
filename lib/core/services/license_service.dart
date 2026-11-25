@@ -339,6 +339,15 @@ class LicenseService {
     await prefs.setString(_prefKeyDelegations, json.encode(list));
   }
 
+  /// Met à jour l'identifiant de cabinet pour la session active (auto-réparation)
+  Future<void> updateSessionCabinetId(String newCabinetId) async {
+    if (_currentSession == null) return;
+    _currentSession = _currentSession!.copyWith(cabinetId: newCabinetId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKeySession, _currentSession!.toJson());
+    debugPrint('[LicenseService] Cabinet ID session mis à jour : $newCabinetId');
+  }
+
   /// Déconnexion de la session courante (pour changer de rôle ou de médecin)
   Future<void> logout() async {
     _currentSession = null;

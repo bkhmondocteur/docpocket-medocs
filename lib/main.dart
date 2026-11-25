@@ -14,9 +14,13 @@ void main() async {
     await LicenseService.instance.init();
     await SupabaseSyncService.instance.init();
 
-    // Synchronisation initiale silencieuse si le cabinet est activé
+    // Synchronisation initiale au démarrage si le cabinet est activé
     if (LicenseService.instance.isAuthenticated) {
-      SupabaseSyncService.instance.syncStock(actionDescription: 'Démarrage application');
+      try {
+        await SupabaseSyncService.instance
+            .syncStock(actionDescription: 'Démarrage application')
+            .timeout(const Duration(seconds: 3));
+      } catch (_) {}
     }
   } catch (e) {
     debugPrint('Init services warning: $e');

@@ -82,6 +82,25 @@ class SupabaseSyncService {
     }
 
     _isInitialized = true;
+    startAutoSyncTimer();
+  }
+
+  Timer? _autoSyncTimer;
+
+  /// Lance la synchronisation périodique automatique en arrière-plan (toutes les 15 secondes)
+  void startAutoSyncTimer() {
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (isConfigured && LicenseService.instance.isAuthenticated && _status != SyncStatus.syncing) {
+        syncStock(actionDescription: 'Synchronisation automatique temps réel');
+      }
+    });
+  }
+
+  /// Arrête la synchronisation périodique automatique
+  void stopAutoSyncTimer() {
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = null;
   }
 
   void _setStatus(SyncStatus newStatus, String message) {
@@ -94,16 +113,38 @@ class SupabaseSyncService {
   }
 
   /// Synchronise le stock du cabinet :
-  /// 1. Télécharge les dernières modifications distantes faites par l'autre utilisateur (Médecin / Secrétaire)
-  /// 2. Pousse l'état local vers Supabase
+  /// 1. Télécharge et fusionne les dernières modifications distantes
+  /// 2. Pousse l'état unifié local vers Supabase
   Future<bool> syncStock({String? actionDescription}) async {
     if (!isConfigured) {
       _setStatus(SyncStatus.idle, 'Supabase non configuré');
       return false;
     }
 
+    // Réparation automatique du cabinet_id pour les sessions Secrétaire
+    if (LicenseService.instance.isSecretary) {
+      final curCab = LicenseService.instance.activeCabinetId;
+      if (curCab == 'CAB_DELEGATED' || curCab == 'CAB_DEFAULT' || curCab.isEmpty) {
+        final secCode = LicenseService.instance.currentSession?.secretary?.accessCode;
+        if (secCode != null && secCode.isNotEmpty) {
+          try {
+            final remoteDel = await findRemoteDelegation(secCode);
+            if (remoteDel != null) {
+              final realCabId = (remoteDel['cabinet_id'] ?? remoteDel['cabinetId']) as String?;
+              if (realCabId != null && realCabId.isNotEmpty) {
+                await LicenseService.instance.updateSessionCabinetId(realCabId);
+                debugPrint('[SupabaseSyncService] Cabinet ID réparé vers : $realCabId');
+              }
+            }
+          } catch (e) {
+            debugPrint('[SupabaseSyncService] Erreur réparation cabinet secrétaire : $e');
+          }
+        }
+      }
+    }
+
     final cabinetId = LicenseService.instance.activeCabinetId;
-    if (cabinetId.isEmpty || cabinetId == 'CAB_DEFAULT') {
+    if (cabinetId.isEmpty || cabinetId == 'CAB_DEFAULT' || cabinetId == 'CAB_DELEGATED') {
       _setStatus(SyncStatus.idle, 'En attente d\'activation du cabinet');
       return false;
     }
@@ -115,7 +156,7 @@ class SupabaseSyncService {
       final operatorName = LicenseService.instance.userDisplayName;
       final action = actionDescription ?? 'Mise à jour du stock';
 
-      // 1. Récupérer l'état distant depuis Supabase
+      // 1. Récupérer l'état distant depuis Supabase et fusionner
       final remoteUrl = Uri.parse('$_supabaseUrl/rest/v1/cabinet_stock?cabinet_id=eq.$cabinetId&select=*');
       final remoteResponse = await http.get(
         remoteUrl,
@@ -130,26 +171,19 @@ class SupabaseSyncService {
         final List<dynamic> data = json.decode(remoteResponse.body) as List<dynamic>;
         if (data.isNotEmpty) {
           final row = data.first as Map<String, dynamic>;
-          final remoteUpdatedAt = DateTime.tryParse(row['updated_at'] as String? ?? '');
           final remoteStockJson = row['stock_json'] as String? ?? '';
-          final remoteUpdatedBy = row['updated_by'] as String? ?? '';
+          final remoteAction = row['last_action'] as String? ?? '';
 
-          // Si le stock distant a été mis à jour par un autre utilisateur plus récemment
-          if (remoteStockJson.isNotEmpty && remoteUpdatedBy != operatorName) {
-            final lastLocalUpdate = _lastSyncTime;
-            if (lastLocalUpdate == null || (remoteUpdatedAt != null && remoteUpdatedAt.isAfter(lastLocalUpdate))) {
-              try {
-                debugPrint('[SupabaseSyncService] Fusion du stock distant mis à jour par : $remoteUpdatedBy');
-                await DatabaseService.instance.importBackupJson(remoteStockJson);
-              } catch (err) {
-                debugPrint('[SupabaseSyncService] Erreur import stock distant ignorée : $err');
-              }
-            }
+          if (remoteStockJson.isNotEmpty) {
+            await DatabaseService.instance.mergeRemoteStockJson(
+              remoteStockJson,
+              remoteAction: remoteAction,
+            );
           }
         }
       }
 
-      // 2. Envoyer le stock local actuel vers Supabase
+      // 2. Envoyer le stock local unifié vers Supabase
       final localJson = await DatabaseService.instance.exportBackupJson();
       final upsertUrl = Uri.parse('$_supabaseUrl/rest/v1/cabinet_stock');
       final payload = {

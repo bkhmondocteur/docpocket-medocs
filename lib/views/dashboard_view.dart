@@ -63,13 +63,24 @@ class _DashboardViewState extends State<DashboardView> {
     super.initState();
     BarcodeHardwareListener.instance.startListening();
     BarcodeHardwareListener.instance.addListener(_onGlobalBarcodeScanned);
-    _syncSub = SupabaseSyncService.instance.onSyncStatusChanged.listen((_) {
-      if (mounted) setState(() {});
+    _syncSub = SupabaseSyncService.instance.onSyncStatusChanged.listen((status) {
+      if (status == SyncStatus.synced && mounted) {
+        _loadData();
+      } else if (mounted) {
+        setState(() {});
+      }
     });
     _loadData();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkAutoBackupPrompt();
     });
+  }
+
+  Future<void> _handleRefresh() async {
+    if (SupabaseSyncService.instance.isConfigured) {
+      await SupabaseSyncService.instance.syncStock(actionDescription: 'Actualisation manuelle');
+    }
+    await _loadData();
   }
 
   Future<void> _checkAutoBackupPrompt() async {
@@ -733,7 +744,7 @@ class _DashboardViewState extends State<DashboardView> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: _handleRefresh,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),

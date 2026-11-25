@@ -154,7 +154,7 @@ class DatabaseService {
     _initialized = true;
   }
 
-  Future<void> _persist() async {
+  Future<void> _persist({bool triggerCloudSync = true}) async {
     final prefs = await SharedPreferences.getInstance();
 
     final medsJson = _medicines.values
@@ -186,7 +186,7 @@ class DatabaseService {
     }
 
     // Synchronisation en arrière-plan avec Supabase Cloud si activée
-    if (SupabaseSyncService.instance.isAutoSyncEnabled && LicenseService.instance.isAuthenticated) {
+    if (triggerCloudSync && SupabaseSyncService.instance.isAutoSyncEnabled && LicenseService.instance.isAuthenticated) {
       SupabaseSyncService.instance.syncStock();
     }
   }
@@ -558,8 +558,97 @@ class DatabaseService {
       _movements.add(StockMovement.fromMap(item as Map<String, dynamic>));
     }
 
-    await _persist();
+    await _persist(triggerCloudSync: false);
     await AutoBackupService.instance.triggerAutoBackup();
+  }
+
+  /// Fusionne intelligemment le stock distant Cloud avec le stock local
+  /// Ne supprime jamais le stock local à moins d'une action explicite "Remise à zéro"
+  /// Retourne true si des modifications locales ont eu lieu
+  Future<bool> mergeRemoteStockJson(String remoteJson, {String? remoteAction}) async {
+    await init();
+    try {
+      final decoded = json.decode(remoteJson) as Map<String, dynamic>;
+      final medsJson = decoded['medicines'] as List<dynamic>? ?? [];
+      final movesJson = decoded['movements'] as List<dynamic>? ?? [];
+
+      // Si l'action distante est une remise à zéro explicite par le Médecin
+      final isClearAction = remoteAction != null && remoteAction.contains('Remise à zéro');
+      if (isClearAction) {
+        if (_medicines.isNotEmpty || _movements.isNotEmpty) {
+          _medicines.clear();
+          _movements.clear();
+          await _persist(triggerCloudSync: false);
+          return true;
+        }
+        return false;
+      }
+
+      bool hasChanges = false;
+
+      // 1. Fusion des mouvements de stock (unicité par ID de mouvement)
+      final existingMoveIds = _movements.map((m) => m.id).toSet();
+      for (final item in movesJson) {
+        final move = StockMovement.fromMap(item as Map<String, dynamic>);
+        if (!existingMoveIds.contains(move.id)) {
+          _movements.add(move);
+          existingMoveIds.add(move.id);
+          hasChanges = true;
+        }
+      }
+      _movements.sort((a, b) => b.movementDate.compareTo(a.movementDate));
+
+      // 2. Fusion des médicaments et lots
+      for (final item in medsJson) {
+        final map = item as Map<String, dynamic>;
+        final batchesJson = map['batches'] as List<dynamic>? ?? [];
+        final remoteBatches = batchesJson.map((b) => MedicineBatch.fromMap(b as Map<String, dynamic>)).toList();
+        final remoteMed = Medicine.fromMap(map, remoteBatches);
+
+        if (!_medicines.containsKey(remoteMed.cipGtin)) {
+          _medicines[remoteMed.cipGtin] = remoteMed;
+          hasChanges = true;
+        } else {
+          final localMed = _medicines[remoteMed.cipGtin]!;
+          final localBatches = List<MedicineBatch>.from(localMed.batches);
+          bool medUpdated = false;
+
+          for (final rb in remoteBatches) {
+            final matchIdx = localBatches.indexWhere((b) =>
+                b.id == rb.id ||
+                b.batchNumber.toLowerCase().trim() == rb.batchNumber.toLowerCase().trim());
+
+            if (matchIdx == -1) {
+              localBatches.add(rb);
+              medUpdated = true;
+            } else {
+              final lb = localBatches[matchIdx];
+              // Conserver la version la plus à jour ou la quantité effective
+              if (rb.receivedDate.isAfter(lb.receivedDate) || rb.quantity != lb.quantity) {
+                if (rb.quantity > lb.quantity || rb.receivedDate.isAfter(lb.receivedDate)) {
+                  localBatches[matchIdx] = rb;
+                  medUpdated = true;
+                }
+              }
+            }
+          }
+
+          if (medUpdated) {
+            _medicines[remoteMed.cipGtin] = localMed.copyWith(batches: localBatches);
+            hasChanges = true;
+          }
+        }
+      }
+
+      if (hasChanges) {
+        await _persist(triggerCloudSync: false);
+      }
+
+      return hasChanges;
+    } catch (e) {
+      debugPrint('[DatabaseService] Erreur mergeRemoteStockJson : $e');
+      return false;
+    }
   }
 
   Future<String> exportInventoryCsv() async {
