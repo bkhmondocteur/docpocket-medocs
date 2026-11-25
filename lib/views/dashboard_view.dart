@@ -582,7 +582,7 @@ class _DashboardViewState extends State<DashboardView> {
                   children: [
                     Icon(Icons.cloud_sync_rounded, color: AppColors.primaryBlue),
                     SizedBox(width: 10),
-                    Text('Synchronisation Supabase Cloud'),
+                    Text('Synchronisation Cloud'),
                   ],
                 ),
               ),

@@ -51,22 +51,21 @@ class SupabaseSyncService {
   final _syncStatusController = StreamController<SyncStatus>.broadcast();
   Stream<SyncStatus> get onSyncStatusChanged => _syncStatusController.stream;
 
-  /// Initialise le service Supabase
+  /// Initialise le service Supabase avec la configuration officielle immuable
   Future<void> init() async {
     if (_isInitialized) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final savedUrl = prefs.getString(_prefKeySupabaseUrl);
-    if (savedUrl == null || savedUrl.contains('tnqydlfxkrtfeyxwbvuo') || savedUrl.isEmpty) {
-      _supabaseUrl = defaultSupabaseUrl;
-      _supabaseAnonKey = defaultSupabaseAnonKey;
+    // Configuration cloud Supabase officielle et immuable
+    _supabaseUrl = defaultSupabaseUrl;
+    _supabaseAnonKey = defaultSupabaseAnonKey;
+    _isAutoSyncEnabled = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefKeySupabaseUrl, _supabaseUrl);
       await prefs.setString(_prefKeySupabaseAnonKey, _supabaseAnonKey);
-    } else {
-      _supabaseUrl = savedUrl;
-      _supabaseAnonKey = prefs.getString(_prefKeySupabaseAnonKey) ?? defaultSupabaseAnonKey;
-    }
-    _isAutoSyncEnabled = prefs.getBool(_prefKeyAutoSync) ?? true;
+      await prefs.setBool(_prefKeyAutoSync, true);
+    } catch (_) {}
 
     // Tentative d'initialisation du SDK Supabase si non déjà fait
     try {
@@ -83,25 +82,6 @@ class SupabaseSyncService {
     }
 
     _isInitialized = true;
-  }
-
-  /// Sauvegarde une nouvelle configuration Supabase (URL et Clé Anonyme)
-  Future<void> saveConfiguration({
-    required String url,
-    required String anonKey,
-    required bool autoSync,
-  }) async {
-    _supabaseUrl = url.trim();
-    _supabaseAnonKey = anonKey.trim();
-    _isAutoSyncEnabled = autoSync;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKeySupabaseUrl, _supabaseUrl);
-    await prefs.setString(_prefKeySupabaseAnonKey, _supabaseAnonKey);
-    await prefs.setBool(_prefKeyAutoSync, _isAutoSyncEnabled);
-
-    // Tenter une synchronisation de test
-    await syncStock(actionDescription: 'Configuration mise à jour');
   }
 
   void _setStatus(SyncStatus newStatus, String message) {
