@@ -309,6 +309,44 @@ class DatabaseService {
     await _persist();
   }
 
+  /// Met à jour les informations d'un médicament (ex: nom commercial en majuscules, forme, dosage, laboratoire)
+  Future<void> updateMedicineInfo({
+    required String cipGtin,
+    required String commercialName,
+    required String dci,
+    required String form,
+    required String dosage,
+    required String laboratory,
+  }) async {
+    await init();
+    final existing = _medicines[cipGtin];
+    if (existing == null) return;
+
+    final updated = existing.copyWith(
+      commercialName: commercialName.trim().toUpperCase(),
+      dci: dci.trim(),
+      form: form.trim(),
+      dosage: dosage.trim(),
+      laboratory: laboratory.trim(),
+      updatedAt: DateTime.now(),
+    );
+
+    _medicines[cipGtin] = updated;
+    await _persist();
+    await AutoBackupService.instance.triggerAutoBackup();
+  }
+
+  /// Supprime définitivement un médicament et ses mouvements du stock du cabinet
+  Future<void> deleteMedicine(String cipGtin) async {
+    await init();
+    final med = _medicines.remove(cipGtin);
+    if (med != null) {
+      _movements.removeWhere((mov) => mov.medicineId == med.id);
+      await _persist();
+      await AutoBackupService.instance.triggerAutoBackup();
+    }
+  }
+
   // --------------------------------------------------------------------------
   // FLUX ENTRÉE EN STOCK
   // --------------------------------------------------------------------------

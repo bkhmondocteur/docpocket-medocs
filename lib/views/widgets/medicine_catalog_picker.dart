@@ -308,13 +308,37 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            med.cleanCommercialName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14.5,
-                                              color: AppColors.slateDark,
-                                            ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  med.cleanCommercialName,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14.5,
+                                                    color: AppColors.slateDark,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (med.isCustom)
+                                                Container(
+                                                  margin: const EdgeInsets.only(left: 6),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.amber.shade50,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: Colors.amber.shade400),
+                                                  ),
+                                                  child: Text(
+                                                    'Hors base',
+                                                    style: TextStyle(
+                                                      color: Colors.amber.shade900,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 10.5,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                           if (form.isNotEmpty || pkg.isNotEmpty)
                                             Padding(
@@ -364,6 +388,79 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
                                       ),
                                     ),
                                     const SizedBox(width: 8),
+                                    if (med.isCustom) ...[
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue, size: 20),
+                                        tooltip: 'Modifier ce médicament hors base',
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        onPressed: () async {
+                                          final updated = await CreateCustomMedicineDialog.show(
+                                            context,
+                                            medicineToEdit: med,
+                                          );
+                                          if (updated != null) {
+                                            _performSearch(_searchController.text);
+                                          }
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                        tooltip: 'Supprimer ce médicament hors base',
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                              title: const Row(
+                                                children: [
+                                                  Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                                                  SizedBox(width: 10),
+                                                  Text('Supprimer le médicament ?', style: TextStyle(fontSize: 17)),
+                                                ],
+                                              ),
+                                              content: Text(
+                                                'Voulez-vous vraiment supprimer "${med.cleanCommercialName}" du catalogue des médicaments ajoutés ?',
+                                                style: const TextStyle(fontSize: 14),
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                                  child: const Text('Annuler'),
+                                                ),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.red,
+                                                    foregroundColor: Colors.white,
+                                                  ),
+                                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                                  child: const Text('Supprimer'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+
+                                          if (confirm == true) {
+                                            await MedicinesCatalogService.instance.deleteCustomMedicine(med);
+                                            _performSearch(_searchController.text);
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Médicament "${med.cleanCommercialName}" supprimé.'),
+                                                  backgroundColor: Colors.red.shade700,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
                                     ElevatedButton(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppColors.primaryBlue,

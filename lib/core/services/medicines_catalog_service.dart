@@ -126,6 +126,12 @@ class MedicinesCatalogService {
   bool get isLoaded => _catalog != null;
   int get count => _catalog?.length ?? 0;
 
+  /// Retourne la liste des médicaments personnalisés créés par l'utilisateur
+  Future<List<CatalogMedicine>> getCustomMedicines() async {
+    await loadCatalog();
+    return List.unmodifiable(_customCatalog);
+  }
+
   Future<List<CatalogMedicine>> loadCatalog() async {
     if (_catalog != null) return _catalog!;
     if (_isLoading) {
@@ -177,15 +183,16 @@ class MedicinesCatalogService {
   }) async {
     await loadCatalog();
 
+    final cleanName = commercialName.trim().toUpperCase();
     final customMed = CatalogMedicine(
-      name: '$commercialName $form $packagingOrVolume'.trim(),
+      name: '$cleanName $form $packagingOrVolume'.trim(),
       dci: dci.trim(),
       form: form.trim(),
       laboratory: laboratory.trim(),
       therapeuticClass: therapeuticClass.trim(),
       dosage: packagingOrVolume.trim(),
       price: '',
-      customName: commercialName.trim(),
+      customName: cleanName,
       customPackaging: packagingOrVolume.trim(),
       isCustom: true,
     );
@@ -206,6 +213,80 @@ class MedicinesCatalogService {
     } catch (_) {}
 
     return customMed;
+  }
+
+  /// Modifie un médicament personnalisé existant dans le catalogue
+  Future<CatalogMedicine> updateCustomMedicine({
+    required CatalogMedicine originalMedicine,
+    required String commercialName,
+    required String dci,
+    required String form,
+    required String packagingOrVolume,
+    required String laboratory,
+    String therapeuticClass = '',
+  }) async {
+    await loadCatalog();
+
+    final cleanName = commercialName.trim().toUpperCase();
+    final updated = CatalogMedicine(
+      name: '$cleanName $form $packagingOrVolume'.trim(),
+      dci: dci.trim(),
+      form: form.trim(),
+      laboratory: laboratory.trim(),
+      therapeuticClass: therapeuticClass.trim(),
+      dosage: packagingOrVolume.trim(),
+      price: originalMedicine.price,
+      customName: cleanName,
+      customPackaging: packagingOrVolume.trim(),
+      isCustom: true,
+    );
+
+    // Mettre à jour dans _customCatalog
+    final customIdx = _customCatalog.indexWhere((m) =>
+        m.cleanCommercialName.toLowerCase() == originalMedicine.cleanCommercialName.toLowerCase() &&
+        m.form.toLowerCase() == originalMedicine.form.toLowerCase());
+    if (customIdx >= 0) {
+      _customCatalog[customIdx] = updated;
+    } else {
+      _customCatalog.insert(0, updated);
+    }
+
+    // Mettre à jour dans _catalog
+    final catIdx = _catalog?.indexWhere((m) =>
+        m.isCustom &&
+        m.cleanCommercialName.toLowerCase() == originalMedicine.cleanCommercialName.toLowerCase() &&
+        m.form.toLowerCase() == originalMedicine.form.toLowerCase()) ?? -1;
+    if (catIdx >= 0 && _catalog != null) {
+      _catalog![catIdx] = updated;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = _customCatalog.map((m) => m.toMap()).toList();
+      await prefs.setString(_prefKeyCustomMeds, json.encode(jsonList));
+    } catch (_) {}
+
+    return updated;
+  }
+
+  /// Supprime un médicament personnalisé du catalogue
+  Future<void> deleteCustomMedicine(CatalogMedicine medicine) async {
+    await loadCatalog();
+
+    _customCatalog.removeWhere((m) =>
+        m.cleanCommercialName.toLowerCase() == medicine.cleanCommercialName.toLowerCase() &&
+        m.form.toLowerCase() == medicine.form.toLowerCase());
+
+    _catalog?.removeWhere((m) =>
+        m.isCustom &&
+        m.cleanCommercialName.toLowerCase() == medicine.cleanCommercialName.toLowerCase() &&
+        m.form.toLowerCase() == medicine.form.toLowerCase());
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = _customCatalog.map((m) => m.toMap()).toList();
+      await prefs.setString(_prefKeyCustomMeds, json.encode(jsonList));
+    } catch (_) {}
   }
 
   /// Recherche par nom commercial, DCI ou laboratoire

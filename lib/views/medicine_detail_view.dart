@@ -4,9 +4,11 @@ import '../../models/medicine.dart';
 import '../../models/stock_alert_level.dart';
 import '../../models/stock_movement.dart';
 import '../../core/database/database_service.dart';
+import '../../core/services/medicines_catalog_service.dart';
 import 'widgets/alert_badge.dart';
 import 'widgets/add_batch_dialog.dart';
 import 'widgets/add_boxes_dialog.dart';
+import 'widgets/create_custom_medicine_dialog.dart';
 
 /// Fiche détaillée du médicament avec historique des lots et des mouvements
 class MedicineDetailView extends StatefulWidget {
@@ -43,6 +45,232 @@ class _MedicineDetailViewState extends State<MedicineDetailView> {
     }
   }
 
+  Future<void> _deleteMedicine() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Supprimer du stock ?',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Voulez-vous vraiment supprimer "${_medicine.commercialName}" ?\n\n'
+          'Attention : Cette action retirera définitivement ce médicament du stock, ainsi que tous ses lots (${_medicine.batches.length}) et l\'historique de ses mouvements (${_movements.length}).',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Supprimer définitivement'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await DatabaseService.instance.deleteMedicine(_medicine.cipGtin);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Médicament "${_medicine.commercialName}" supprimé du stock.'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        Navigator.of(context).pop(true);
+      }
+    }
+  }
+
+  Future<void> _editMedicine() async {
+    final nameCtrl = TextEditingController(text: _medicine.commercialName);
+    final dciCtrl = TextEditingController(text: _medicine.dci);
+    final formCtrl = TextEditingController(text: _medicine.form);
+    final dosageCtrl = TextEditingController(text: _medicine.dosage);
+    final labCtrl = TextEditingController(text: _medicine.laboratory);
+    final formKey = GlobalKey<FormState>();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_note_rounded, color: AppColors.primaryBlue, size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Modifier le Médicament',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [
+                      UpperCaseTextFormatter(),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: 'Nom commercial (en MAJUSCULES) *',
+                      prefixIcon: const Icon(Icons.medication_rounded, color: AppColors.primaryBlue),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Le nom commercial est requis' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: dciCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'DCI (Principe actif)',
+                      prefixIcon: const Icon(Icons.science_outlined, color: AppColors.primaryBlue),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: formCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Forme galénique (ex: Comprimé, Sirop)',
+                      prefixIcon: const Icon(Icons.category_outlined, color: AppColors.primaryBlue),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: dosageCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Conditionnement / Dosage (ex: Boîte de 30)',
+                      prefixIcon: const Icon(Icons.inventory_2_outlined, color: AppColors.primaryBlue),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: labCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Laboratoire fabricant',
+                      prefixIcon: const Icon(Icons.business_outlined, color: AppColors.primaryBlue),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text('Enregistrer'),
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(ctx).pop(true);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      final newName = nameCtrl.text.trim().toUpperCase();
+      final newDci = dciCtrl.text.trim();
+      final newForm = formCtrl.text.trim();
+      final newDosage = dosageCtrl.text.trim();
+      final newLab = labCtrl.text.trim();
+
+      await DatabaseService.instance.updateMedicineInfo(
+        cipGtin: _medicine.cipGtin,
+        commercialName: newName,
+        dci: newDci,
+        form: newForm,
+        dosage: newDosage,
+        laboratory: newLab,
+      );
+
+      // Si présent dans le catalogue personnalisé, synchroniser également
+      final customMeds = await MedicinesCatalogService.instance.getCustomMedicines();
+      final matchInCatalog = customMeds.cast<CatalogMedicine?>().firstWhere(
+        (m) =>
+            m != null &&
+            (m.cleanCommercialName.toLowerCase() == _medicine.commercialName.toLowerCase() ||
+             m.cleanCommercialName.toLowerCase() == newName.toLowerCase()),
+        orElse: () => null,
+      );
+      if (matchInCatalog != null) {
+        await MedicinesCatalogService.instance.updateCustomMedicine(
+          originalMedicine: matchInCatalog,
+          commercialName: newName,
+          dci: newDci,
+          form: newForm,
+          packagingOrVolume: newDosage,
+          laboratory: newLab,
+          therapeuticClass: _medicine.therapeuticClass,
+        );
+      }
+
+      await _loadHistory();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Informations du médicament mises à jour avec succès.'),
+            backgroundColor: AppColors.alertValid,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,6 +280,19 @@ class _MedicineDetailViewState extends State<MedicineDetailView> {
         backgroundColor: AppColors.primaryBlue,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Modifier ce médicament',
+            onPressed: _editMedicine,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded),
+            tooltip: 'Supprimer du stock',
+            onPressed: _deleteMedicine,
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

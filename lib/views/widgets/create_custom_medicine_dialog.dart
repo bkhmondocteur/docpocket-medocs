@@ -1,18 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/medicines_catalog_service.dart';
 
-/// Boîte de dialogue pour créer et ajouter un médicament non répertorié dans la base officielle
-/// Champs : Nom commercial, DCI, Forme galénique, Boîte de combien ou Volume, et Laboratoire
+/// Formateur forçant la saisie en majuscules
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
+}
+
+/// Boîte de dialogue pour créer ou modifier un médicament non répertorié dans la base officielle
+/// Champs : Nom commercial (en majuscules), DCI, Forme galénique, Boîte de combien ou Volume, et Laboratoire
 class CreateCustomMedicineDialog extends StatefulWidget {
   final String? initialName;
+  final CatalogMedicine? medicineToEdit;
 
-  const CreateCustomMedicineDialog({super.key, this.initialName});
+  const CreateCustomMedicineDialog({
+    super.key,
+    this.initialName,
+    this.medicineToEdit,
+  });
 
-  static Future<CatalogMedicine?> show(BuildContext context, {String? initialName}) {
+  static Future<CatalogMedicine?> show(
+    BuildContext context, {
+    String? initialName,
+    CatalogMedicine? medicineToEdit,
+  }) {
     return showDialog<CatalogMedicine>(
       context: context,
-      builder: (_) => CreateCustomMedicineDialog(initialName: initialName),
+      builder: (_) => CreateCustomMedicineDialog(
+        initialName: initialName,
+        medicineToEdit: medicineToEdit,
+      ),
     );
   }
 
@@ -30,6 +54,7 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
   final _labController = TextEditingController();
 
   bool _isLoading = false;
+  bool get _isEditing => widget.medicineToEdit != null;
 
   final List<String> _commonForms = [
     'Comprimé',
@@ -67,8 +92,15 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
   @override
   void initState() {
     super.initState();
-    if (widget.initialName != null && widget.initialName!.trim().isNotEmpty) {
-      _nameController.text = widget.initialName!.trim();
+    if (widget.medicineToEdit != null) {
+      final m = widget.medicineToEdit!;
+      _nameController.text = m.cleanCommercialName.toUpperCase();
+      _dciController.text = m.dci;
+      _formController.text = m.form;
+      _packagingController.text = m.packaging;
+      _labController.text = m.laboratory;
+    } else if (widget.initialName != null && widget.initialName!.trim().isNotEmpty) {
+      _nameController.text = widget.initialName!.trim().toUpperCase();
     }
   }
 
@@ -88,25 +120,39 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
     setState(() => _isLoading = true);
 
     try {
-      final name = _nameController.text.trim();
+      final name = _nameController.text.trim().toUpperCase();
       final dci = _dciController.text.trim();
       final form = _formController.text.trim();
       final packaging = _packagingController.text.trim();
       final lab = _labController.text.trim();
 
-      final created = await MedicinesCatalogService.instance.addCustomMedicine(
-        commercialName: name,
-        dci: dci,
-        form: form,
-        packagingOrVolume: packaging,
-        laboratory: lab,
-      );
+      CatalogMedicine result;
+      if (_isEditing) {
+        result = await MedicinesCatalogService.instance.updateCustomMedicine(
+          originalMedicine: widget.medicineToEdit!,
+          commercialName: name,
+          dci: dci,
+          form: form,
+          packagingOrVolume: packaging,
+          laboratory: lab,
+        );
+      } else {
+        result = await MedicinesCatalogService.instance.addCustomMedicine(
+          commercialName: name,
+          dci: dci,
+          form: form,
+          packagingOrVolume: packaging,
+          laboratory: lab,
+        );
+      }
 
       if (mounted) {
-        Navigator.of(context).pop(created);
+        Navigator.of(context).pop(result);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Médicament "$name" ajouté au catalogue avec succès !'),
+            content: Text(_isEditing
+                ? 'Médicament "$name" modifié avec succès !'
+                : 'Médicament "$name" ajouté au catalogue avec succès !'),
             backgroundColor: AppColors.alertValid,
           ),
         );
@@ -143,29 +189,35 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.primaryLight,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.playlist_add_rounded, color: AppColors.primaryBlue, size: 28),
+                        child: Icon(
+                          _isEditing ? Icons.edit_rounded : Icons.playlist_add_rounded,
+                          color: AppColors.primaryBlue,
+                          size: 28,
+                        ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Nouveau Médicament',
-                              style: TextStyle(
+                              _isEditing ? 'Modifier le Médicament' : 'Nouveau Médicament',
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.slateDark,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              'Ajouter un médicament non répertorié dans la base',
-                              style: TextStyle(fontSize: 12, color: AppColors.slateMedium),
+                              _isEditing
+                                  ? 'Modifier les informations du médicament hors base'
+                                  : 'Ajouter un médicament non répertorié dans la base',
+                              style: const TextStyle(fontSize: 12, color: AppColors.slateMedium),
                             ),
                           ],
                         ),
@@ -178,13 +230,16 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
                   ),
                   const SizedBox(height: 18),
 
-                  // 1. Nom commercial
+                  // 1. Nom commercial en MAJUSCULES
                   TextFormField(
                     controller: _nameController,
-                    textCapitalization: TextCapitalization.words,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [
+                      UpperCaseTextFormatter(),
+                    ],
                     decoration: InputDecoration(
-                      labelText: 'Nom commercial du médicament *',
-                      hintText: 'Ex: Esocare 20, Panadol 500 mg, Mag 2...',
+                      labelText: 'Nom commercial du médicament (en MAJUSCULES) *',
+                      hintText: 'EX: ESOCARE 20, PANADOL 500 MG, MAG 2...',
                       prefixIcon: const Icon(Icons.medication_rounded, color: AppColors.primaryBlue),
                       filled: true,
                       fillColor: Colors.grey.shade50,
@@ -317,8 +372,10 @@ class _CreateCustomMedicineDialogState extends State<CreateCustomMedicineDialog>
                                 )
                               : const Icon(Icons.check_circle_rounded, size: 20),
                           label: Text(
-                            _isLoading ? 'Création...' : 'Créer & Assigner',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            _isLoading
+                                ? (_isEditing ? 'Enregistrement...' : 'Création...')
+                                : (_isEditing ? 'Enregistrer les modifications' : 'Créer & Assigner'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                           ),
                         ),
                       ),
