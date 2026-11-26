@@ -273,20 +273,82 @@ class MedicinesCatalogService {
   Future<void> deleteCustomMedicine(CatalogMedicine medicine) async {
     await loadCatalog();
 
+    final cleanName = medicine.cleanCommercialName.toLowerCase().trim();
     _customCatalog.removeWhere((m) =>
-        m.cleanCommercialName.toLowerCase() == medicine.cleanCommercialName.toLowerCase() &&
-        m.form.toLowerCase() == medicine.form.toLowerCase());
+        m.cleanCommercialName.toLowerCase().trim() == cleanName &&
+        m.form.toLowerCase().trim() == medicine.form.toLowerCase().trim());
 
     _catalog?.removeWhere((m) =>
         m.isCustom &&
-        m.cleanCommercialName.toLowerCase() == medicine.cleanCommercialName.toLowerCase() &&
-        m.form.toLowerCase() == medicine.form.toLowerCase());
+        m.cleanCommercialName.toLowerCase().trim() == cleanName &&
+        m.form.toLowerCase().trim() == medicine.form.toLowerCase().trim());
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = _customCatalog.map((m) => m.toMap()).toList();
       await prefs.setString(_prefKeyCustomMeds, json.encode(jsonList));
     } catch (_) {}
+  }
+
+  /// Fusionne les médicaments personnalisés distants en tenant compte des suppressions
+  Future<void> mergeRemoteCustomMedicines(
+    List<dynamic> remoteList, {
+    Set<String>? deletedKeys,
+  }) async {
+    await loadCatalog();
+    bool changed = false;
+
+    for (final item in remoteList) {
+      try {
+        final med = CatalogMedicine.fromMap(item as Map<String, dynamic>);
+        final cleanName = med.cleanCommercialName.toLowerCase().trim();
+
+        // Si le médicament figure dans les suppressions
+        final isDeleted = deletedKeys != null &&
+            deletedKeys.any((k) =>
+                k.toLowerCase().trim() == cleanName ||
+                k.toLowerCase().trim() == med.name.toLowerCase().trim());
+
+        if (isDeleted) {
+          _customCatalog.removeWhere((m) =>
+              m.cleanCommercialName.toLowerCase().trim() == cleanName &&
+              m.form.toLowerCase().trim() == med.form.toLowerCase().trim());
+          _catalog?.removeWhere((m) =>
+              m.isCustom &&
+              m.cleanCommercialName.toLowerCase().trim() == cleanName &&
+              m.form.toLowerCase().trim() == med.form.toLowerCase().trim());
+          changed = true;
+          continue;
+        }
+
+        final existingIdx = _customCatalog.indexWhere((m) =>
+            m.cleanCommercialName.toLowerCase().trim() == cleanName &&
+            m.form.toLowerCase().trim() == med.form.toLowerCase().trim());
+
+        if (existingIdx == -1) {
+          _customCatalog.insert(0, med);
+          _catalog?.insert(0, med);
+          changed = true;
+        } else {
+          _customCatalog[existingIdx] = med;
+          final catIdx = _catalog?.indexWhere((m) =>
+              m.isCustom &&
+              m.cleanCommercialName.toLowerCase().trim() == cleanName &&
+              m.form.toLowerCase().trim() == med.form.toLowerCase().trim()) ?? -1;
+          if (catIdx >= 0 && _catalog != null) {
+            _catalog![catIdx] = med;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (changed) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final jsonList = _customCatalog.map((m) => m.toMap()).toList();
+        await prefs.setString(_prefKeyCustomMeds, json.encode(jsonList));
+      } catch (_) {}
+    }
   }
 
   /// Recherche par nom commercial, DCI ou laboratoire

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/database/database_service.dart';
 import '../../core/services/medicines_catalog_service.dart';
 import 'create_custom_medicine_dialog.dart';
 
@@ -447,6 +448,16 @@ class _MedicineCatalogPickerDialogState extends State<MedicineCatalogPickerDialo
 
                                           if (confirm == true) {
                                             await MedicinesCatalogService.instance.deleteCustomMedicine(med);
+                                            final inStock = DatabaseService.instance.findExistingMedicine(
+                                              commercialName: med.cleanCommercialName,
+                                              form: med.form,
+                                              dosage: med.packaging,
+                                            );
+                                            if (inStock != null) {
+                                              await DatabaseService.instance.deleteMedicine(inStock.cipGtin);
+                                            } else {
+                                              await DatabaseService.instance.recordMedicineDeletion(med.cleanCommercialName);
+                                            }
                                             _performSearch(_searchController.text);
                                             if (context.mounted) {
                                               ScaffoldMessenger.of(context).showSnackBar(
